@@ -1,0 +1,7 @@
+# Consistent project text; Markdown uses intentional hard line breaks.
+* text=auto
+*.md text eol=lf whitespace=-blank-at-eol
+*.json text eol=lf
+
+# Preserve supplied resources byte-for-byte, including original line endings.
+docs/resources/** -text
