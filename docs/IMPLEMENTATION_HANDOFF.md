@@ -1,5 +1,9 @@
 # FareEnough implementation handoff
 
+## Scope update — 12 October 2026
+
+The user approved direct rider and driver participation, superseding the earlier no-driver-portal scope below. The frontend now has Rider, Driver, and Support demo personas. A rider opens a local case; its assigned demo driver responds to that same case; support sees both narratives. Each party view/export includes only their own narrative and a neutral shared status. Missing responses do not establish fault. Browser-local storage is a demonstration, not authentication or durable backend persistence. Backend integration must enforce driver assignment, immutable submissions, role-scoped projections, and duplicate protection. No external notifications or live AI runs have been added.
+
 Read [SRS.md](../SRS.md) before implementation. It is the detailed product baseline; this file is a short entry point for a new conversation.
 
 ## Agreed product
