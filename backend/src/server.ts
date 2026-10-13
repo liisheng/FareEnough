@@ -15,7 +15,7 @@ export async function buildServer(): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({
     logger: {
       level: 'info',
-      redact: ['*.MODEL_API_KEY', '*.SESSION_SECRET'],
+      redact: ['*.MODEL_API_KEY', '*.SESSION_SECRET', '*.ADP_RIDER_APP_KEY', '*.ADP_DRIVER_APP_KEY', '*.ADP_JUDGE_APP_KEY', '*.AppKey'],
     },
   });
 

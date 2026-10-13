@@ -125,5 +125,17 @@ describe('deterministic decision validation', () => {
 
     expect(result.status).toBe('human_review');
     expect(result.reasonCodes).toContain('AGENT_REQUESTED_HUMAN_REVIEW');
+    expect(result.evidenceCitations).toEqual(['gps-005']);
+    expect(result.policyCitations).toEqual(['ORG-NS-03']);
+  });
+
+  it('blocks an automatic outcome when the Judge reports material uncertainty', () => {
+    const result = validateAgentJudgeProposal('DISP-002', {
+      outcome: 'uphold_fee', proposedAdjustmentCents: 0,
+      evidenceIds: ['derived_wait_duration'], policyRuleIds: ['ORG-NS-03'],
+      uncertainty: ['The decisive waiting evidence conflicts.'],
+    }, established480);
+    expect(result.status).toBe('human_review');
+    expect(result.amountMinor).toBe(0);
   });
 });

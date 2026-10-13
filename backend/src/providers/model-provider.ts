@@ -16,4 +16,5 @@ export interface ModelProvider {
   readonly id: string;
   readonly mode: 'replay' | 'live';
   generate(request: ModelProviderRequest): Promise<unknown>;
+  abort?(): void;
 }

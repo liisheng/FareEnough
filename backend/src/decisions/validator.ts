@@ -118,6 +118,7 @@ export interface AgentJudgeProposalInput {
   evidenceIds: string[];
   policyRuleIds: string[];
   explanation?: string;
+  uncertainty?: string[];
 }
 
 /** Converts the agent contract into the untrusted proposal validated above. */
@@ -126,12 +127,15 @@ export function validateAgentJudgeProposal(
   proposal: AgentJudgeProposalInput,
   waitingDuration: DecisionValidationInput['waitingDuration'],
 ): DecisionResult {
-  if (proposal.outcome === 'human_review') {
-    return review(
-      { caseId, proposal, waitingDuration },
-      ['AGENT_REQUESTED_HUMAN_REVIEW'],
+  if (proposal.outcome === 'human_review' || (proposal.uncertainty?.length ?? 0) > 0) {
+    return {
+      status: 'human_review', caseId, disposition: null, action: 'human_review',
+      amountMinor: 0, currency: 'SGD',
+      evidenceCitations: unique(proposal.evidenceIds.filter((id) => DISP002_EVIDENCE_IDS.has(id))),
+      policyCitations: unique(proposal.policyRuleIds.filter((id) => DISP002_POLICY_RULE_IDS.has(id))),
+      reasonCodes: [proposal.outcome === 'human_review' ? 'AGENT_REQUESTED_HUMAN_REVIEW' : 'AGENT_REPORTED_MATERIAL_UNCERTAINTY'],
       proposal,
-    );
+    };
   }
 
   return validateDecision({

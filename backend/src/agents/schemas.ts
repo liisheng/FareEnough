@@ -7,7 +7,7 @@ export const CitedClaimSchema = z.object({
   text: z.string().min(1),
   evidenceIds: z.array(z.string()).min(1),
   policyRuleIds: z.array(z.string()).default([]),
-});
+}).strict();
 
 export const AdvocateBriefSchema = z.object({
   role: AgentRoleSchema,
@@ -16,7 +16,7 @@ export const AdvocateBriefSchema = z.object({
   adverseEvidence: z.array(CitedClaimSchema),
   concessions: z.array(z.string()),
   unansweredQuestions: z.array(z.string()),
-});
+}).strict();
 export type AdvocateBrief = z.infer<typeof AdvocateBriefSchema>;
 
 export const RebuttalSchema = z.object({
@@ -25,7 +25,7 @@ export const RebuttalSchema = z.object({
   challengedClaim: z.string().min(1),
   claims: z.array(CitedClaimSchema).min(1),
   preservedConcessions: z.array(z.string()),
-});
+}).strict();
 export type Rebuttal = z.infer<typeof RebuttalSchema>;
 
 export const JudgeProposalSchema = z.object({
@@ -34,9 +34,9 @@ export const JudgeProposalSchema = z.object({
   findings: z.array(CitedClaimSchema).min(1),
   evidenceIds: z.array(z.string()).min(1),
   policyRuleIds: z.array(z.string()).min(1),
-  proposedAdjustmentCents: z.number().int(),
+  proposedAdjustmentCents: z.number().int().nonnegative(),
   uncertainty: z.array(z.string()),
-});
+}).strict();
 export type JudgeProposal = z.infer<typeof JudgeProposalSchema>;
 
 export type AgentStage = 'rider_brief' | 'driver_brief' | 'rider_rebuttal' | 'driver_rebuttal' | 'judge';

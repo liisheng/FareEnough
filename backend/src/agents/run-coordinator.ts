@@ -31,7 +31,9 @@ export interface RunCoordinatorOptions {
 }
 
 function assertGrounded(output: ProviderOutput, tools: CaseEvidenceTools): void {
-  const claims = 'claims' in output ? output.claims : output.findings;
+  const claims = 'claims' in output
+    ? [...output.claims, ...('adverseEvidence' in output ? output.adverseEvidence : [])]
+    : output.findings;
   const evidenceIds = [...claims.flatMap((claim) => claim.evidenceIds), ...('evidenceIds' in output ? output.evidenceIds : [])];
   const policyIds = [...claims.flatMap((claim) => claim.policyRuleIds), ...('policyRuleIds' in output ? output.policyRuleIds : [])];
   const invalidEvidence = [...new Set(evidenceIds.filter((id) => !tools.hasEvidence(id)))];
@@ -60,10 +62,12 @@ export async function runThreeAgentReview(
     await emit(stage, 'started', role, `${role} started ${stage.replaceAll('_', ' ')}`);
     try {
       const value = parse(await provider.generate({ stage, conversationId: `${runId}:${stage}`, systemPrompt: prompt, evidence: tools.snapshot(), priorOutputs: prior }));
+      if ('role' in value && value.role !== role) throw new Error('Agent role does not match requested stage');
       assertGrounded(value, tools);
       await emit(stage, 'completed', role, `${role} completed ${stage.replaceAll('_', ' ')}`);
       return value;
     } catch (error) {
+      provider.abort?.();
       await emit(stage, 'failed', role, `${role} failed ${stage.replaceAll('_', ' ')}`);
       throw error;
     }
@@ -74,12 +78,19 @@ export async function runThreeAgentReview(
   ]);
 
   // No prior output is supplied to either brief, preserving independent contexts.
-  const [riderBrief, driverBrief] = await Promise.all([
+  const briefs = await Promise.allSettled([
     call('rider_brief', 'rider_advocate', riderPrompt, [], (v) => AdvocateBriefSchema.parse(v)),
     call('driver_brief', 'driver_advocate', driverPrompt, [], (v) => AdvocateBriefSchema.parse(v)),
   ]);
-  const riderRebuttal = await call('rider_rebuttal', 'rider_advocate', riderPrompt, [driverBrief], (v) => RebuttalSchema.parse(v));
-  const driverRebuttal = await call('driver_rebuttal', 'driver_advocate', driverPrompt, [riderBrief], (v) => RebuttalSchema.parse(v));
+  // Drain both initial calls so failed runs cannot continue in the background.
+  const failed = briefs.find((result) => result.status === 'rejected');
+  if (failed?.status === 'rejected') throw failed.reason;
+  const riderBrief = (briefs[0] as PromiseFulfilledResult<AdvocateBrief>).value;
+  const driverBrief = (briefs[1] as PromiseFulfilledResult<AdvocateBrief>).value;
+  // Each advocate needs its own original concessions as well as the opposing
+  // brief. Neither sees the other rebuttal, preserving independent responses.
+  const riderRebuttal = await call('rider_rebuttal', 'rider_advocate', riderPrompt, [riderBrief, driverBrief], (v) => RebuttalSchema.parse(v));
+  const driverRebuttal = await call('driver_rebuttal', 'driver_advocate', driverPrompt, [driverBrief, riderBrief], (v) => RebuttalSchema.parse(v));
   const judgeProposal = await call('judge', 'judge', judgePrompt, [riderBrief, driverBrief, riderRebuttal, driverRebuttal], (v) => JudgeProposalSchema.parse(v));
 
   return { runId, caseId: projection.caseId, provider: { id: provider.id, mode: provider.mode }, riderBrief, driverBrief, riderRebuttal, driverRebuttal, judgeProposal, events };

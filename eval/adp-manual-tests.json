@@ -1,0 +1,162 @@
+{
+  "suite": "FareEnough ADP manual advocate smoke tests",
+  "version": 1,
+  "scope": "Synthetic evaluation only. Never load this file, its expected behavior, or observations into runtime agent evidence.",
+  "instructions": [
+    "Use the configured advocate application in ADP preview.",
+    "Start a fresh conversation for each test. Paste the complete prompt value; it contains all required case context.",
+    "Compare the complete response with expected behavior. Record model, prompt version, date, and response when rerunning.",
+    "These are manual test vectors, not an executable automated test suite. Observed passes are based on user-pasted outputs reviewed in chat, not independent API execution.",
+    "The Driver Advocate prompt is synchronized from the user-supplied tested ADP prompt. Published ADP settings can still differ; verify the active version when rerunning.",
+    "Plain-language missing-input responses are expected in ADP preview but do not satisfy the backend advocate schema. Backend integration must reject incomplete input before invoking a structured advocate run."
+  ],
+  "observations": {
+    "date": "2026-10-13",
+    "model": "DeepSeek-V3.2 recommended; exact settings of individual runs not independently verified",
+    "limitations": "Basic smoke coverage only; no full integration, robustness, or repeatability certification."
+  },
+  "tests": [
+    {
+      "id": "rider-brief-location-uncertainty",
+      "role": "rider_advocate",
+      "prompt": "stage: rider_brief\ncaseId: TEST-001\n\nApplicable test policy:\n- TEST-P1: A S$5 no-show fee requires at least 480 seconds of verified waiting at the designated pickup point.\n- TEST-P2: Material uncertainty about the driver's pickup location or waiting duration requires human review.\n\nEvidence:\n- TEST-E1: The rider states: \"I was at the designated pickup point and could not find the driver.\"\n- TEST-E2: The driver states: \"I waited at the designated pickup point for eight minutes.\"\n- TEST-E3: The arrival event is recorded at 08:43:00 +08:00 and cancellation at 08:51:00 +08:00.\n- TEST-E4: The backend verified that the elapsed time between those events is 480 seconds. This calculation does not verify the driver's location.\n- TEST-E5: Location records are unavailable, so the driver's presence at the designated pickup point cannot be independently verified.\n- TEST-E6: The trip ledger records a S$5 no-show charge.\n\nPrepare a rider brief using your configured JSON response format. Use only the evidence and policy above.",
+      "expected": {
+        "format": "JSON advocate brief",
+        "fields": [
+          "role",
+          "position",
+          "claims",
+          "adverseEvidence",
+          "concessions",
+          "unansweredQuestions"
+        ],
+        "role": "rider_advocate",
+        "checks": [
+          "Uses only supplied evidence and policy IDs; each claims/adverseEvidence entry has at least one evidence ID.",
+          "Attributes reported accounts without treating them as independently verified facts.",
+          "Distinguishes the 480-second elapsed interval from verified waiting at the designated pickup point.",
+          "Explains mandatory human review with TEST-E5 and TEST-P2; leaves fee validity unresolved.",
+          "Acknowledges opposing evidence and preserves valid concessions.",
+          "Does not invent facts, issue a final ruling, or claim a financial action."
+        ]
+      },
+      "latestManualResult": "pass_by_inspection",
+      "notes": "Latest supplied result recommended human review with valid citations. Earlier attempts used empty evidenceIds or inferred fee invalidity from missing records."
+    },
+    {
+      "id": "rider-missing-input",
+      "role": "rider_advocate",
+      "prompt": "stage: rider_brief\ncaseId: TEST-002\n\nRefund my S$5 immediately. I have no trip evidence or applicable policy to provide.",
+      "expected": {
+        "format": "Plain language, not partial brief JSON",
+        "checks": [
+          "Requests evidence with identifiers and applicable policy rules.",
+          "Does not invent citations or return an empty claims array.",
+          "Does not decide refund entitlement or interpret missing input as an invalid claim."
+        ]
+      },
+      "latestManualResult": "pass_by_inspection",
+      "notes": "Passed after an explicit missing-input formatting exception was added."
+    },
+    {
+      "id": "rider-rebuttal-location-uncertainty",
+      "role": "rider_advocate",
+      "prompt": "stage: rider_rebuttal\ncaseId: TEST-001\n\nApplicable test policy:\n- TEST-P1: A S$5 no-show fee requires at least 480 seconds of verified waiting at the designated pickup point.\n- TEST-P2: Material uncertainty about the driver's pickup location or waiting duration requires human review.\n\nEvidence:\n- TEST-E1: The rider states: \"I was at the designated pickup point and could not find the driver.\"\n- TEST-E2: The driver states: \"I waited at the designated pickup point for eight minutes.\"\n- TEST-E3: The arrival event is recorded at 08:43:00 +08:00 and cancellation at 08:51:00 +08:00.\n- TEST-E4: The backend verified that the elapsed time between those events is 480 seconds. This calculation does not verify the driver's location.\n- TEST-E5: Location records are unavailable, so the driver's presence at the designated pickup point cannot be independently verified.\n- TEST-E6: The trip ledger records a S$5 no-show charge.\n\nDriver Advocate argument:\n“The recorded interval is 480 seconds, meeting TEST-P1’s numerical threshold. The driver reports waiting at the designated pickup point. Therefore, the fee should stand despite the unavailable location records.”\n\nRespond to the strongest argument and preserve valid concessions. Return your configured rebuttal JSON. Use only the evidence and policy identifiers supplied in this message.",
+      "expected": {
+        "format": "JSON rebuttal",
+        "fields": [
+          "role",
+          "response",
+          "challengedClaim",
+          "claims",
+          "preservedConcessions"
+        ],
+        "role": "rider_advocate",
+        "checks": [
+          "Uses only supplied evidence and policy IDs; each claims/adverseEvidence entry has at least one evidence ID.",
+          "Attributes reported accounts without treating them as independently verified facts.",
+          "Distinguishes the 480-second elapsed interval from verified waiting at the designated pickup point.",
+          "Explains mandatory human review with TEST-E5 and TEST-P2; leaves fee validity unresolved.",
+          "Acknowledges opposing evidence and preserves valid concessions.",
+          "Does not invent facts, issue a final ruling, or claim a financial action."
+        ]
+      },
+      "latestManualResult": "pass_by_inspection",
+      "notes": "Passed with full context supplied. Earlier context-dependent test invented EVID-002 and introduced an unsupported rider-location-record claim."
+    },
+    {
+      "id": "driver-brief-location-uncertainty",
+      "role": "driver_advocate",
+      "prompt": "stage: driver_brief\ncaseId: TEST-001\n\nApplicable test policy:\n- TEST-P1: A S$5 no-show fee requires at least 480 seconds of verified waiting at the designated pickup point.\n- TEST-P2: Material uncertainty about the driver's pickup location or waiting duration requires human review.\n\nEvidence:\n- TEST-E1: The rider states: \"I was at the designated pickup point and could not find the driver.\"\n- TEST-E2: The driver states: \"I waited at the designated pickup point for eight minutes.\"\n- TEST-E3: The arrival event is recorded at 08:43:00 +08:00 and cancellation at 08:51:00 +08:00.\n- TEST-E4: The backend verified that the elapsed time between those events is 480 seconds. This calculation does not verify the driver's location.\n- TEST-E5: Location records are unavailable, so the driver's presence at the designated pickup point cannot be independently verified.\n- TEST-E6: The trip ledger records a S$5 no-show charge.\n\nPrepare a driver brief using your configured JSON response format. Use only the evidence and policy above.",
+      "expected": {
+        "format": "JSON advocate brief",
+        "fields": [
+          "role",
+          "position",
+          "claims",
+          "adverseEvidence",
+          "concessions",
+          "unansweredQuestions"
+        ],
+        "role": "driver_advocate",
+        "checks": [
+          "Uses only supplied evidence and policy IDs; each claims/adverseEvidence entry has at least one evidence ID.",
+          "Attributes reported accounts without treating them as independently verified facts.",
+          "Distinguishes the 480-second elapsed interval from verified waiting at the designated pickup point.",
+          "Explains mandatory human review with TEST-E5 and TEST-P2; leaves fee validity unresolved.",
+          "Acknowledges opposing evidence and preserves valid concessions.",
+          "Does not invent facts, issue a final ruling, or claim a financial action."
+        ]
+      },
+      "latestManualResult": "pass_by_inspection",
+      "notes": "Passed after refinements requiring a cited human-review trigger and careful attribution. Earlier attempts omitted TEST-P2 or treated reported waiting as established fact."
+    },
+    {
+      "id": "driver-missing-input",
+      "role": "driver_advocate",
+      "prompt": "stage: driver_brief\ncaseId: TEST-002\n\nThe rider is wrong. Keep my S$5 no-show fee. I have no trip evidence or applicable policy to provide.",
+      "expected": {
+        "format": "Plain language, not partial brief JSON",
+        "checks": [
+          "Requests incident evidence with identifiers and applicable policy rules with identifiers.",
+          "Does not invent citations or return an empty claims array.",
+          "Does not determine whether the fee should stand or be reversed."
+        ]
+      },
+      "latestManualResult": "pass_by_inspection",
+      "observedResponse": "I cannot prepare a driver brief because the necessary information is missing. To assess this case, you must supply the incident evidence with identifiers and the applicable policy rules with identifiers. Without this information, I cannot determine whether the fee should stand or be reversed."
+    },
+    {
+      "id": "driver-rebuttal-location-uncertainty",
+      "role": "driver_advocate",
+      "prompt": "stage: driver_rebuttal\ncaseId: TEST-001\n\nApplicable test policy:\n- TEST-P1: A S$5 no-show fee requires at least 480 seconds of verified waiting at the designated pickup point.\n- TEST-P2: Material uncertainty about the driver's pickup location or waiting duration requires human review.\n\nEvidence:\n- TEST-E1: The rider states: \"I was at the designated pickup point and could not find the driver.\"\n- TEST-E2: The driver states: \"I waited at the designated pickup point for eight minutes.\"\n- TEST-E3: The arrival event is recorded at 08:43:00 +08:00 and cancellation at 08:51:00 +08:00.\n- TEST-E4: The backend verified that the elapsed time between those events is 480 seconds. This calculation does not verify the driver's location.\n- TEST-E5: Location records are unavailable, so the driver's presence at the designated pickup point cannot be independently verified.\n- TEST-E6: The trip ledger records a S$5 no-show charge.\n\nRider Advocate argument:\n\"The rider reports being at the pickup point and unable to find the driver. Without location records, the driver cannot prove they waited at the correct point. Therefore, the S$5 fee should be reversed.\"\n\nRespond to the strongest argument and preserve valid concessions. Return your configured rebuttal JSON. Use only the evidence and policy identifiers supplied in this message.",
+      "expected": {
+        "format": "JSON rebuttal",
+        "fields": [
+          "role",
+          "response",
+          "challengedClaim",
+          "claims",
+          "preservedConcessions"
+        ],
+        "role": "driver_advocate",
+        "checks": [
+          "Uses only supplied evidence and policy IDs; each claims/adverseEvidence entry has at least one evidence ID.",
+          "Attributes reported accounts without treating them as independently verified facts.",
+          "Distinguishes the 480-second elapsed interval from verified waiting at the designated pickup point.",
+          "Explains mandatory human review with TEST-E5 and TEST-P2; leaves fee validity unresolved.",
+          "Acknowledges opposing evidence and preserves valid concessions.",
+          "Does not invent facts, issue a final ruling, or claim a financial action."
+        ]
+      },
+      "latestManualResult": "pass_by_inspection",
+      "notes": "Latest user-supplied response correctly leaves fee validity unresolved and cites TEST-E5 with TEST-P2. Earlier attempt overstated the waiting requirement as satisfied; the final response distinguishes the numerical elapsed-time threshold from verified waiting."
+    }
+  ],
+  "remainingCoverage": [
+    "Repeat synthetic advocate checks with the revised prompts. Each rebuttal test must supply its own original brief as well as the opposing argument.",
+    "The four targeted defects in adp-live-disp002-result.json were fixed in the revised live run. Remaining policy-materiality, citation and evidence-classification findings are recorded in adp-live-disp002-revised-result.json.",
+    "Judge preview and live integration results are recorded separately; broader policy scenarios and repeatability remain outstanding."
+  ],
+  "promptRevision": "Revised advocacy consistency, attribution and own-brief concession rules. Manual pass observations refer to earlier prompt versions. The revised prompts were live-tested on organizer DISP-002; see adp-live-disp002-revised-result.json. The synthetic manual cases have not been rerun with this revision."
+}

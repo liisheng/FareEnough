@@ -50,7 +50,7 @@ export class ReplayModelProvider implements ModelProvider {
       };
       case 'judge': return {
         outcome: 'uphold_fee',
-        explanation: 'The rider account is acknowledged, but the available operational evidence corroborates arrival, contact attempts, and the configured eight-minute waiting threshold. This is a proposal pending deterministic validation.',
+        explanation: 'The rider account is acknowledged, but the available operational evidence corroborates arrival, contact attempts, and the configured eight-minute waiting threshold. The rider\'s precise position is not independently recorded; it does not change the elapsed-time test in this organizer profile. This is a proposal pending deterministic validation.',
         findings: [
           { text: 'The vehicle arrived at and remained at the pickup coordinates.', evidenceIds: ['gps-005', 'gps-006', 'gps-007', 'gps-008', 'evt-004'], policyRuleIds: [] },
           { text: 'The derived waiting duration is 480 seconds, matching the selected no-show threshold.', evidenceIds: ['derived_wait_duration'], policyRuleIds: ['ORG-NS-03', 'ORG-NS-05'] },
@@ -59,7 +59,8 @@ export class ReplayModelProvider implements ModelProvider {
         evidenceIds: ['dispute-001', 'gps-005', 'gps-006', 'gps-007', 'gps-008', 'chat-001', 'chat-002', 'chat-003', 'chat-004', 'chat-005', 'evt-004', 'evt-005', 'derived_wait_duration'],
         policyRuleIds: ['ORG-NS-03', 'ORG-NS-05'],
         proposedAdjustmentCents: 0,
-        uncertainty: ['The rider\'s precise location within the pickup area is not independently recorded.'],
+        // This field is reserved for unresolved material questions, per Judge contract.
+        uncertainty: [],
       };
     }
   }

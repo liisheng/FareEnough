@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeDb, setTestDb } from '../src/db/connection.js';
 import { runMigrations } from '../src/db/migrate.js';
 import { runRoutes } from '../src/routes/runs.js';
+import { parseConfig } from '../src/config.js';
+import { ReplayModelProvider } from '../src/providers/replay-provider.js';
 
 describe('POST case run', () => {
   let db: Database.Database;
@@ -50,12 +52,53 @@ describe('POST case run', () => {
     expect((db.prepare('SELECT count(*) AS count FROM simulated_actions').get() as any).count).toBe(0);
   });
 
-  it('rejects implicit or live execution in the replay-only baseline', async () => {
+  it('rejects live execution when it has not been configured', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/cases/DISP-002/runs',
       payload: { mode: 'live' },
     });
     expect(response.statusCode).toBe(400);
+  });
+
+  async function enableLive(factory: () => any, sessionLimit = '60') {
+    await app.close();
+    app = Fastify({ logger: false });
+    await app.register(runRoutes, {
+      env: parseConfig({ AI_MODE: 'live', MODEL_PROVIDER: 'adp', ADP_RIDER_APP_KEY: 'test-rider', ADP_DRIVER_APP_KEY: 'test-driver', ADP_JUDGE_APP_KEY: 'test-judge', MAX_MODEL_CALLS_PER_SESSION: sessionLimit }),
+      liveProviderFactory: factory,
+    });
+  }
+
+  it('persists explicit live mode and enforces the server session call budget', async () => {
+    await enableLive(() => {
+      const replay = new ReplayModelProvider();
+      return { id: 'test-adp', mode: 'live', generate: replay.generate.bind(replay) };
+    }, '5');
+    const response = await app.inject({ method: 'POST', url: '/api/cases/DISP-002/runs', payload: { mode: 'live' } });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ mode: 'live', provider: { mode: 'live' } });
+    expect(db.prepare('SELECT mode FROM agent_runs').get()).toEqual({ mode: 'live' });
+    const again = await app.inject({ method: 'POST', url: '/api/cases/DISP-002/runs', payload: { mode: 'live' } });
+    expect(again.statusCode).toBe(429);
+  });
+
+  it('records failed live runs without leaking upstream errors or creating decisions', async () => {
+    await enableLive(() => ({ id: 'test-adp', mode: 'live', async generate() { throw new Error('secret-upstream-value'); } }));
+    const response = await app.inject({ method: 'POST', url: '/api/cases/DISP-002/runs', payload: { mode: 'live' } });
+    expect(response.statusCode).toBe(502);
+    expect(response.json().status).toBe('human_review');
+    expect(response.body).not.toContain('secret-upstream-value');
+    const row = db.prepare('SELECT status, error_message FROM agent_runs').get() as any;
+    expect(row.status).toBe('failed');
+    expect(row.error_message).not.toContain('secret-upstream-value');
+    expect(db.prepare('SELECT count(*) AS n FROM decisions').get()).toEqual({ n: 0 });
+    expect(db.prepare('SELECT count(*) AS n FROM simulated_actions').get()).toEqual({ n: 0 });
+  });
+
+  it('rejects browser requests from another website without invoking a provider', async () => {
+    const response = await app.inject({ method: 'POST', url: '/api/cases/DISP-002/runs', headers: { origin: 'https://other.example' }, payload: { mode: 'replay' } });
+    expect(response.statusCode).toBe(403);
+    expect(db.prepare('SELECT count(*) AS n FROM agent_runs').get()).toEqual({ n: 0 });
   });
 });

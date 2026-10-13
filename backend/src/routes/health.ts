@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getDb } from '../db/connection.js';
-import { AI_MODE } from '../config.js';
+import { AI_MODE, isAdpConfigured } from '../config.js';
 
 // ---------------------------------------------------------------------------
 // GET /health — returns backend and database readiness.
@@ -18,12 +18,14 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
       database = false;
     }
 
-    const provider = AI_MODE === 'live';
+    const provider = isAdpConfigured();
 
     return reply.send({
       status: database ? 'ok' : 'degraded',
       database,
       provider,
+      mode: AI_MODE,
+      liveAvailable: provider,
       timestamp: new Date().toISOString(),
     });
   });

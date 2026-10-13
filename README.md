@@ -2,7 +2,7 @@
 
 FareEnough is a local hackathon prototype for fair, explainable ride dispute resolution. A Rider Advocate and Driver Advocate independently assess the same evidence, complete one rebuttal round, and present their cases to a Judge. Deterministic code then validates the proposed outcome before anything can be recorded as an action.
 
-This baseline implements the seeded DISP-002 no-show dispute as an end-to-end, auditable replay. It does not call a live model or execute a real payment.
+This baseline implements the seeded DISP-002 no-show dispute with an auditable replay and an optional Tencent ADP live adapter. Financial outcomes remain simulations. Live operation requires the three published ADP applications and an explicit Live AI run; local automated tests use synthetic responses.
 
 ## Run the local demo
 
@@ -23,7 +23,21 @@ The responsive workspace has two views:
 - Rider outcome: a concise explanation, fee treatment, decisive facts and policy citations.
 - Support review: the 480-second derived fact, progress events, separate advocate briefs, rebuttals, Judge proposal and validated result.
 
-The `REPLAY` label is intentional: the provider returns deterministic structured responses for a reliable demo. The same orchestration boundary can later receive a live provider after credentials are configured and live-mode tests are added.
+Replay remains selected by default. The support view enables Live AI only when the backend reports configured ADP access. Live runs send the sanitized organizer fixture to Tencent ADP; no model call starts on page load or mode selection. The result displays the actual run mode, and cases needing human review are labeled accordingly.
+
+### Connect published ADP applications
+
+Copy `.env.example` to `backend/.env` (ignored by Git). Set `MODEL_PROVIDER=adp`, fill `ADP_RIDER_APP_KEY`, `ADP_DRIVER_APP_KEY`, and `ADP_JUDGE_APP_KEY`, and set `AI_MODE=live` when ready to enable external calls. Never put AppKeys in frontend files, screenshots, logs, or commits. Configuration always loads `backend/.env`, including when launched from another directory. Relative database paths still resolve against the process working directory; use the npm scripts from the project root consistently.
+
+Run `npm run build`, then `npm start` and `npm run frontend` in separate terminals. Select Live AI in Support review and click Start. Each run makes at most five ADP calls with separate conversations: two briefs, two rebuttals, and one Judge proposal. Every call receives the full case evidence and selected policy; only the appropriate prior arguments are included. The repository prompt is supplied through ADP's `SystemRole` parameter.
+
+The v2 SSE endpoint is restricted to `https://wss.lke.tencentcloud.com/adp/v2/chat`, following the [official HTTP SSE API](https://www.tencentcloud.com/document/product/1254/81449). Only the completed assistant reply is parsed. One enclosing JSON code fence is tolerated; arbitrary prose, plain-text clarifications, wrong roles, unknown citations (including adverse evidence), extra fields, and malformed proposals fail validation. Transport and validation failures leave no automatic financial decision, record a sanitized failed run, and never silently fall back to replay.
+
+Limits are five calls per run, one concurrent live run, and at most 60 reserved calls per server process (configurable downward with `MAX_MODEL_CALLS_PER_SESSION`). Failed runs retain their five-call reservation. Restarting the process resets this counter. Per-call and run deadlines use `MODEL_CALL_TIMEOUT_MS` and `RUN_TIMEOUT_MS`, capped at 120 and 480 seconds. Input is bounded to 256 KiB per call and 1 MiB per run; SSE responses to 2 MiB per call; final answers to 120 KiB. There are no automatic retries. These limits are not a billing ceiling; cancelling HTTP does not guarantee Tencent stops an already-started generation. Token and currency budget settings are not advertised because this adapter does not enforce them.
+
+For an explicitly authorized live smoke test, build first, then run `node scripts/live-adp-smoke.mjs --run` from `backend/`. It temporarily enables ADP for that process, sends the organizer sample for up to five calls, stores the usual local audit trail, and prints only status metadata. Without `--run` it makes no call. Live API verification is separate from passing offline tests.
+
+The deterministic financial evaluator supports only the seeded DISP-002 organizer profile. A live model connection does not expand that policy coverage to arbitrary cases or route disputes. Reported material uncertainty always blocks automatic validation.
 
 Frontend files are organized as follows:
 
@@ -92,12 +106,12 @@ All commands are Windows-compatible and run from the project root.
 | --- | --- | --- |
 | GET | `/health` | Returns `{ status, database, provider, timestamp }`. Does not trigger model calls. |
 | GET | `/api/cases/DISP-002/evidence` | Returns a safe case/evidence projection with derived facts. Strips historical rider/driver profile data. |
-| POST | `/api/cases/DISP-002/runs` | Runs the explicit replay workflow with body `{ "mode": "replay" }`, validates it and persists its audit trail. |
+| POST | `/api/cases/DISP-002/runs` | Runs an explicit `{ "mode": "replay" }` or configured `{ "mode": "live" }` review, validates it and persists its audit trail. |
 
 ### Three-agent baseline
 
 - Rider Advocate and Driver Advocate receive independent initial contexts.
-- Each advocate gets one rebuttal against the other side's brief.
+- Each advocate gets one rebuttal with both its own original brief and the other side's brief. Neither advocate sees the other's rebuttal; each can preserve its own concessions.
 - The Judge receives both briefs and both rebuttals, then returns a structured proposal with evidence and policy citations.
 - Zod checks every agent output and citation IDs are verified against case-scoped evidence tools.
 - Deterministic code owns the 480-second threshold and S$5 reversal calculation. Uncertain, malformed, contradictory or uncited proposals go to human review.
@@ -134,7 +148,7 @@ backend/
       cases.ts             GET /api/cases/:id/evidence
       runs.ts              POST /api/cases/:id/runs
     agents/                Prompts, structured schemas and five-call coordinator
-    providers/             Provider interface and deterministic replay provider
+    providers/             Provider interface, replay provider and ADP v2 SSE adapter
     tools/                 Case-scoped, read-only evidence/policy retrieval
     decisions/             Deterministic policy evaluator and safety validator
     persistence/           Atomic audit-trail persistence
