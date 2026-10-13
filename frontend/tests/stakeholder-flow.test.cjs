@@ -1,73 +1,38 @@
-const {test} = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const vm = require('node:vm');
-const source = fs.readFileSync(require('node:path').join(__dirname,'../scripts/app.js'),'utf8');
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const ui=require('../scripts/app.js');
 
-function boot(saved = new Map()) {
-  const elements = new Map(), listeners = {}, exports = [];
-  const element = key => {
-    if (!elements.has(key)) elements.set(key,{value:'',innerHTML:'',textContent:'',checked:false,listeners:{},addEventListener(t,f){this.listeners[t]=f;},setAttribute(){},removeAttribute(){},setCustomValidity(s){this.validityMessage=s;},reportValidity(){},showModal(){},close(){}});
-    return elements.get(key);
-  };
-  element('#trip').value='USER-TRIP-1';
-  element('#category').value='no-show';
-  element('#status-filter').value=element('#category-filter').value='all';
-  const context = {document:{querySelector:element,addEventListener(t,f){listeners[t]=f;},createElement(){return {click(){}};}},localStorage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)},location:{hash:'#rider'},window:{addEventListener(){}},Blob:class {constructor(parts){exports.push(JSON.parse(parts.join('')));}},URL:{createObjectURL(){return 'blob:test';},revokeObjectURL(){}},setTimeout:f=>f()};
-  vm.createContext(context);vm.runInContext(source,context);
-  return {element,context,exports,saved,submit:id=>element(id).listeners.submit({preventDefault(){}}),click:dataset=>listeners.click({target:{closest:()=>({dataset})}})};
-}
+const evidencePayload={caseId:'DISP-002',gpsTelemetry:Array.from({length:8}),chatLogs:Array.from({length:6}),cancellationPolicy:{noShowThresholdMin:8},derivedFacts:[{id:'derived_wait_duration',value:480,unit:'seconds'}]};
+const run={runId:'RUN-1',caseId:'DISP-002',mode:'replay',status:'completed',events:[{stage:'rider_brief',status:'completed'},{stage:'driver_brief',status:'completed'},{stage:'judge',status:'completed'}],riderBrief:{position:'The rider disputes the charge.',claims:[{text:'The pickup was unclear.',evidenceIds:['CHAT-01'],policyRuleIds:[]}],adverseEvidence:[{text:'The driver waited eight minutes.',evidenceIds:['GPS-05'],policyRuleIds:[]}]},driverBrief:{position:'The trip record supports the driver.',claims:[{text:'Arrival was recorded.',evidenceIds:['GPS-05'],policyRuleIds:[]}]},riderRebuttal:{response:'The rider acknowledges the wait record.',preservedConcessions:['Eight minutes were recorded.'],claims:[{text:'Location remains uncertain.',evidenceIds:['EVENT-03'],policyRuleIds:[]}]},driverRebuttal:{response:'The communication log corroborates contact.',claims:[{text:'A call was attempted.',evidenceIds:['CALL-01'],policyRuleIds:[]}]},judgeProposal:{outcome:'uphold_fee',proposedAdjustmentCents:0,policyRuleIds:['POL-1'],explanation:'The recorded wait met the case policy.'},validatedDecision:{disposition:'claim_rejected',dispositionLabel:'Rider claim not upheld',feeTreatment:'Existing fee upheld',action:'uphold_fee',amountMinor:0,confidence:1,decisiveFacts:['The recorded wait was 480 seconds.'],policyRuleIds:['POL-1'],explanation:'The recorded wait met the case policy.',validationStatus:'validated'}};
 
-test('linked stakeholder accounts persist, stay separate in views/exports, and cannot be duplicated',()=>{
-  const app=boot(), e=app.element;
-  assert.match(e('#driver-cases').innerHTML,/No disputes awaiting your response/);
-  e('#complaint').value='RIDER_PRIVATE: I was waiting at the pickup.';
-  app.submit('#intake-form');
-  const id=JSON.parse(app.saved.get('fareenough.requests.v1'))[0].id;
-  assert.match(e('#rider-outcome').innerHTML,/Awaiting driver response/);
-  assert.doesNotMatch(e('#driver-detail').innerHTML,/RIDER_PRIVATE/);
-  e('#driver-account').value='   ';app.submit('#driver-form');
-  assert.match(e('#driver-account').validityMessage,/10 and 2,000/);
-  e('#driver-account').value='DRIVER_PRIVATE: <script>test</script> I waited near pickup.';
-  app.submit('#driver-form');
-  assert.match(e('#rider-outcome').innerHTML,/Both accounts received/);
-  assert.doesNotMatch(e('#rider-outcome').innerHTML,/DRIVER_PRIVATE/);
-  assert.match(e('#driver-detail').innerHTML,/&lt;script&gt;/);
-  app.click({supportCase:id});
-  assert.match(e('#workspace').innerHTML,/RIDER_PRIVATE/);
-  assert.match(e('#workspace').innerHTML,/DRIVER_PRIVATE/);
-  app.click({export:'rider'});app.click({export:'driver'});
-  assert.doesNotMatch(JSON.stringify(app.exports[0]),/DRIVER_PRIVATE/);
-  assert.doesNotMatch(JSON.stringify(app.exports[1]),/RIDER_PRIVATE/);
-  app.submit('#intake-form');
-  assert.equal(JSON.parse(app.saved.get('fareenough.requests.v1')).length,1);
-  const reloaded=boot(app.saved);
-  assert.match(reloaded.element('#driver-detail').innerHTML,/DRIVER_PRIVATE/);
-  assert.match(reloaded.element('#rider-outcome').innerHTML,/Both accounts received/);
-  reloaded.context.location.hash='#driver';vm.runInContext('renderView()',reloaded.context);
-  assert.equal(reloaded.element('#driver-view').hidden,false);
-  assert.equal(reloaded.element('#rider-view').hidden,true);
+test('normalizes the seeded evidence projection and renders deterministic facts',()=>{
+  const ev=ui.evidenceView(evidencePayload);
+  assert.deepEqual({wait:ev.waitSeconds,gps:ev.gpsCount,comms:ev.communicationCount},{wait:480,gps:8,comms:6});
+  assert.match(ui.factStrip(ev),/480 seconds/);
+  assert.match(ui.factStrip(ev),/8 points/);
 });
 
-test('safety flag remains in human review after both accounts and refresh',()=>{
-  const app=boot();app.element('#complaint').value='A safety concern needs a human reviewer.';app.element('#safety').checked=true;app.submit('#intake-form');
-  app.element('#driver-account').value='My account is ready for human review.';app.submit('#driver-form');
-  const reloaded=boot(app.saved);
-  assert.match(reloaded.element('#driver-detail').innerHTML,/Human review required/);
-  assert.match(reloaded.element('#rider-outcome').innerHTML,/Human review requested/);
+test('API helpers request the evidence and replay endpoints with the expected contract',async()=>{
+  const requests=[];
+  const fetcher=async(url,options={})=>{requests.push({url,options});return {ok:true,json:async()=>({ok:true})};};
+  await ui.fetchEvidence(fetcher);await ui.startReplay(fetcher);
+  assert.match(requests[0].url,/\/api\/cases\/DISP-002\/evidence$/);
+  assert.match(requests[1].url,/\/api\/cases\/DISP-002\/runs$/);
+  assert.equal(requests[1].options.method,'POST');
+  assert.deepEqual(JSON.parse(requests[1].options.body),{mode:'replay'});
 });
 
+test('renders advocate separation, rebuttals, citations and a validated simulated outcome',()=>{
+  const html=ui.supportReady(ui.evidenceView(evidencePayload),run);
+  assert.match(html,/Rider Advocate/);assert.match(html,/Driver Advocate/);
+  assert.match(html,/Rider Advocate rebuttal/);assert.match(html,/Driver Advocate rebuttal/);
+  assert.match(html,/CHAT-01/);assert.match(html,/GPS-05/);assert.match(html,/POL-1/);
+  assert.match(html,/VALIDATED DECISION/);assert.match(html,/S\$0\.00/);assert.match(html,/100%/);
+  assert.match(html,/No real refund, charge or account action/);
+});
 
-test('empty startup has no seeded records; legacy narratives survive without invented trip metadata',()=>{
-  const fresh=boot();
-  assert.match(fresh.element('#rider-cases').innerHTML,/No requests submitted/);
-  assert.match(fresh.element('#workspace').innerHTML,/No case selected/);
-  const saved=new Map([['fareenough.requests.v1',JSON.stringify([{id:'LOCAL-123',type:'route',complaint:'Preserve my previously entered account.',driverAccount:'Preserve the driver account too.',status:'pending',filed:'Previously saved'}])]]);
-  const migrated=boot(saved);
-  assert.match(migrated.element('#rider-outcome').innerHTML,/Preserve my previously entered/);
-  assert.match(migrated.element('#driver-detail').innerHTML,/Preserve the driver account/);
-  assert.doesNotMatch([...['#rider-outcome','#driver-detail','#workspace'].map(id=>migrated.element(id).innerHTML)].join(''),/DEMO-10|S\$|EX-00|synthetic-route|organizer-disp/);
-  migrated.click({export:'support'});
-  assert.equal(migrated.exports[0].policy,null);
-  assert.equal(migrated.exports[0].adjustmentCents,null);
+test('rider outcome is concise and backend failure is explicit',()=>{
+  const rider=ui.riderReady(ui.evidenceView(evidencePayload),run);
+  assert.match(rider,/Rider claim not upheld/);assert.match(rider,/S\$0\.00 simulated adjustment/);assert.match(rider,/480 seconds/);
+  const error=ui.errorCard('<offline>');assert.match(error,/BACKEND UNAVAILABLE/);assert.match(error,/&lt;offline&gt;/);assert.match(error,/No case action was taken/);
 });

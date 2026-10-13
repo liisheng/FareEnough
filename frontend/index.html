@@ -1,39 +1,10 @@
 <!doctype html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ed3466"><title>FareEnough | Dispute workspace</title><link rel="stylesheet" href="styles/styles.css"><script src="scripts/app.js" defer></script></head>
-<body>
-<a class="skip" href="#main">Skip to workspace</a>
-<header class="header"><a class="brand" href="#rider">fare<span>enough</span><b>.</b></a><nav aria-label="Demo persona"><a href="#rider" id="rider-link">Rider</a><a href="#driver" id="driver-link">Driver</a><a href="#support" id="support-link">Support</a></nav><span class="local">LOCAL DEMO</span></header>
-<div class="demo-bar"><span><strong>Frontend demonstration</strong> · No trip data connected</span><span>Provider: not connected · No financial actions</span></div>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ed3466"><title>FareEnough | Evidence-led dispute review</title><link rel="stylesheet" href="styles/styles.css"><link rel="stylesheet" href="styles/demo.css"><script src="scripts/app.js" defer></script></head>
+<body><a class="skip" href="#main">Skip to case</a>
+<header class="header"><a class="brand" href="#rider">fare<span>enough</span><b>.</b></a><nav aria-label="Demo view"><a id="rider-link" href="#rider">Rider outcome</a><a id="support-link" href="#support">Support review</a></nav><span class="local">SEEDED CASE · DISP-002</span></header>
+<div class="demo-bar"><span><strong>REPLAY DEMO</strong> · Organizer-provided no-show case</span><span>Simulated decision · No real payment action</span></div>
 <main id="main" tabindex="-1">
-<section id="rider-view">
-  <div class="page-heading"><div><span class="eyebrow">RIDER WORKSPACE</span><h1>Let’s make it fair.</h1><p>Tell us about your ride. Understand the evidence. See what happens next.</p></div><span class="persona">Demo persona · Rider A</span></div>
-  <div class="rider-grid">
-    <section class="card intake"><div class="section-heading"><span class="number">01</span><div><h2>Request a fare review</h2><p>Enter the reference for the trip you want reviewed.</p></div></div>
-      <form id="intake-form">
-        <label for="trip">Trip reference</label><input id="trip" maxlength="80" required placeholder="Enter your trip reference" autocomplete="off">
-        <p class="small">Trip details are not connected. Your reference will be saved as unverified.</p>
-        <label for="category">What would you like reviewed?</label><select id="category" required><option value="no-show">No-show charge</option><option value="route">Route or additional charge</option></select>
-        <label for="complaint">Your perspective</label><textarea id="complaint" rows="5" minlength="10" maxlength="2000" required placeholder="Describe what happened and what you would like checked. "></textarea><div class="input-help"><span>10–2,000 characters</span><span id="count">0 / 2000</span></div>
-        <label class="check"><input type="checkbox" id="safety"> This includes a safety incident or another concern that needs a person.</label>
-        <button class="button" type="submit">Submit request <span aria-hidden="true">→</span></button><p class="small">Saved only in this browser. No request is sent to Ryde or an AI service.</p><p id="form-message" role="status"></p>
-      </form>
-    </section>
-    <div><section class="card"><div class="section-heading"><span class="number">02</span><div><h2>Your cases</h2><p>Requests you have submitted.</p></div></div><div id="rider-cases" class="case-list"></div></section><section class="card outcome" id="rider-outcome" aria-live="polite"></section></div>
-  </div>
-</section>
-<section id="driver-view" hidden>
-  <div class="page-heading"><div><span class="eyebrow">DRIVER WORKSPACE</span><h1>Your side matters, too.</h1><p>Review the trip in question and share what happened from your perspective.</p></div><span class="persona">Demo persona · Driver A</span></div>
-  <p class="notice">Local demo: requests appear here when a rider saves a complaint. No notification is sent. A missing response never establishes fault.</p>
-  <div class="rider-grid"><section class="card"><div class="section-heading"><span class="number">01</span><div><h2>Requests for your account</h2><p>Each response joins the existing rider case.</p></div></div><div id="driver-cases" class="case-list"></div></section><section class="card" id="driver-detail" aria-live="polite"></section></div>
-</section>
-<section id="support-view" hidden>
-  <div class="page-heading"><div><span class="eyebrow">INTERNAL SUPPORT · DEMONSTRATION</span><h1>Evidence before a verdict.</h1><p>Inspect both perspectives, review uncertainty, and explain the outcome.</p></div><span class="persona">Demo persona · Support reviewer</span></div>
-  <p class="notice">View switching demonstrates layout only; it is not authentication. Submitted accounts are stored in this browser; no server-side access control is connected.</p>
-  <div class="support-grid"><aside class="card queue"><h2>Case queue</h2><label for="search">Search case ID</label><input id="search" type="search" placeholder="Search case reference"><label for="status-filter">Status</label><select id="status-filter"><option value="all">All statuses</option><option value="review">Review required</option><option value="pending">Awaiting review</option></select><label for="category-filter">Category</label><select id="category-filter"><option value="all">All categories</option><option value="no-show">No-show charge</option><option value="route">Route / charge</option></select><div id="queue-list" class="case-list"></div></aside><section id="workspace" aria-live="polite"></section></div>
-</section>
-<section class="process"><div><span class="eyebrow">HOW THE PLANNED REVIEW WORKS</span><h2>Three roles. Both sides heard.</h2></div><article><b>01 · Rider Advocate</b><p>Builds the rider’s case from supported evidence.</p></article><article><b>02 · Driver Advocate</b><p>Examines the driver’s records and responds to opposing evidence.</p></article><article><b>03 · Judge</b><p>Weighs both arguments. Uncertainty goes to human review.</p></article></section>
-</main>
-<footer><span class="brand">fare<span>enough</span><b>.</b></span><span>Local hackathon prototype · Not an official Ryde service</span><span>No real payments or messages</span></footer>
-
-</body></html>
+<section id="rider-view"><div class="page-heading"><div><span class="eyebrow">RIDER OUTCOME</span><h1>A decision you can inspect.</h1><p>See what was reviewed, why it mattered, and what happens to your fare.</p></div><span class="persona">Case DISP-002</span></div><div id="rider-content" aria-live="polite"><section class="card loading-card"><h2>Loading case evidence…</h2><p>Connecting to the local FareEnough backend.</p></section></div></section>
+<section id="support-view" hidden><div class="page-heading"><div><span class="eyebrow">INTERNAL SUPPORT · REPLAY</span><h1>Evidence before a verdict.</h1><p>Watch two advocates challenge the case before a judge proposal is validated.</p></div><span class="persona">Human-review workspace</span></div><div class="support-grid"><aside class="card queue"><span class="eyebrow">CASE QUEUE</span><h2>1 seeded case</h2><button class="case-button" aria-pressed="true"><span class="case-top"><strong>DISP-002</strong><span id="queue-badge" class="badge pending">Ready</span></span><small>No-show charge · Singapore</small><small id="queue-detail">Loading evidence…</small></button><div class="privacy-note"><strong>Scoped evidence</strong><p>Names, ratings, dispute history and payment method are withheld from agents.</p></div></aside><div id="support-content" aria-live="polite"><section class="card loading-card"><h2>Loading evidence…</h2></section></div></div></section>
+<section class="process"><div><span class="eyebrow">CONTROLLED MULTI-AGENT REVIEW</span><h2>Three roles. One validated outcome.</h2></div><article><b>01 · Rider Advocate</b><p>Builds the strongest evidence-supported rider case.</p></article><article><b>02 · Driver Advocate</b><p>Tests it against trip records and policy.</p></article><article><b>03 · Judge + validator</b><p>Proposes a decision; deterministic code checks it.</p></article></section>
+</main><footer><span class="brand">fare<span>enough</span><b>.</b></span><span>Hackathon prototype · Not an official Ryde service</span><span>No real payments or messages</span></footer></body></html>

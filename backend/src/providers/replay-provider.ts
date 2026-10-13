@@ -1,0 +1,66 @@
+import type { ModelProvider, ModelProviderRequest } from './model-provider.js';
+
+/**
+ * Deterministic demo fallback. This is explicitly not a live model.
+ * Outputs cite only IDs present in the supplied safe evidence snapshot and do
+ * not read the evaluation answer key.
+ */
+export class ReplayModelProvider implements ModelProvider {
+  readonly id = 'fareenough-structured-replay-v1';
+  readonly mode = 'replay' as const;
+
+  async generate(request: ModelProviderRequest): Promise<unknown> {
+    switch (request.stage) {
+      case 'rider_brief': return {
+        role: 'rider_advocate',
+        position: 'The rider disputes the fee because they report being at the pickup lobby and unable to locate the vehicle.',
+        claims: [{ text: 'The complaint states the rider was at the pickup point and could not find the car.', evidenceIds: ['dispute-001'], policyRuleIds: [] }],
+        adverseEvidence: [
+          { text: 'GPS records place a stationary vehicle at the pickup coordinates from arrival through cancellation.', evidenceIds: ['gps-005', 'gps-006', 'gps-007', 'gps-008'], policyRuleIds: [] },
+          { text: 'The record contains multiple driver contact attempts and an unanswered call.', evidenceIds: ['chat-001', 'chat-002', 'chat-003', 'chat-004', 'chat-005'], policyRuleIds: [] },
+        ],
+        concessions: ['The structured record does not corroborate the rider complaint with a rider message, call, or location record.'],
+        unansweredQuestions: ['The record does not establish the rider\'s exact physical position within the lobby.'],
+      };
+      case 'driver_brief': return {
+        role: 'driver_advocate',
+        position: 'The driver record supports arrival, waiting, attempted contact, and cancellation after the configured threshold.',
+        claims: [
+          { text: 'GPS and the arrival event corroborate arrival at the pickup point at 08:43.', evidenceIds: ['gps-005', 'evt-004'], policyRuleIds: [] },
+          { text: 'The deterministic waiting fact records 480 seconds between the wait anchor and cancellation.', evidenceIds: ['derived_wait_duration'], policyRuleIds: ['ORG-NS-03', 'ORG-NS-05'] },
+          { text: 'The driver attempted contact before cancellation.', evidenceIds: ['chat-001', 'chat-002', 'chat-003', 'chat-004', 'chat-005'], policyRuleIds: [] },
+        ],
+        adverseEvidence: [{ text: 'The rider directly asserts that they were at the lobby.', evidenceIds: ['dispute-001'], policyRuleIds: [] }],
+        concessions: ['GPS establishes the vehicle location, not whether the parties visually encountered one another.'],
+        unansweredQuestions: ['No rider-device location record is available.'],
+      };
+      case 'rider_rebuttal': return {
+        role: 'rider_advocate',
+        response: 'Vehicle GPS supports the driver location but cannot alone disprove that the rider was elsewhere in the pickup lobby.',
+        challengedClaim: 'The operational record conclusively establishes rider absence.',
+        claims: [{ text: 'The complaint reports presence at the lobby, while GPS describes only the vehicle.', evidenceIds: ['dispute-001', 'gps-005'], policyRuleIds: [] }],
+        preservedConcessions: ['The record strongly corroborates that the vehicle was stationary at the pickup coordinates.'],
+      };
+      case 'driver_rebuttal': return {
+        role: 'driver_advocate',
+        response: 'Even if the rider was somewhere in the lobby, the driver arrival, notification, contact attempts, and elapsed wait are independently recorded.',
+        challengedClaim: 'The rider assertion alone establishes that the driver failed to appear.',
+        claims: [{ text: 'Arrival, rider notification, contact, and waiting are corroborated by separate records.', evidenceIds: ['evt-004', 'evt-005', 'chat-003', 'derived_wait_duration'], policyRuleIds: ['ORG-NS-03'] }],
+        preservedConcessions: ['The evidence cannot establish the rider\'s exact position.'],
+      };
+      case 'judge': return {
+        outcome: 'uphold_fee',
+        explanation: 'The rider account is acknowledged, but the available operational evidence corroborates arrival, contact attempts, and the configured eight-minute waiting threshold. This is a proposal pending deterministic validation.',
+        findings: [
+          { text: 'The vehicle arrived at and remained at the pickup coordinates.', evidenceIds: ['gps-005', 'gps-006', 'gps-007', 'gps-008', 'evt-004'], policyRuleIds: [] },
+          { text: 'The derived waiting duration is 480 seconds, matching the selected no-show threshold.', evidenceIds: ['derived_wait_duration'], policyRuleIds: ['ORG-NS-03', 'ORG-NS-05'] },
+          { text: 'The driver made multiple contact attempts before cancellation.', evidenceIds: ['chat-001', 'chat-002', 'chat-003', 'chat-004', 'chat-005'], policyRuleIds: [] },
+        ],
+        evidenceIds: ['dispute-001', 'gps-005', 'gps-006', 'gps-007', 'gps-008', 'chat-001', 'chat-002', 'chat-003', 'chat-004', 'chat-005', 'evt-004', 'evt-005', 'derived_wait_duration'],
+        policyRuleIds: ['ORG-NS-03', 'ORG-NS-05'],
+        proposedAdjustmentCents: 0,
+        uncertainty: ['The rider\'s precise location within the pickup area is not independently recorded.'],
+      };
+    }
+  }
+}

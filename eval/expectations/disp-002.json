@@ -1,0 +1,10 @@
+{
+  "caseId": "DISP-002",
+  "expectedDisposition": "claim_rejected",
+  "expectedFeeTreatment": "upheld",
+  "expectedWaitSeconds": 480,
+  "expectedAction": "no_change",
+  "expectedAmountMinor": 0,
+  "expectedPolicyProfile": "organizer-disp002-v1",
+  "note": "Evaluation-only answer key. Never imported by runtime/agent code."
+}

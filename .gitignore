@@ -1,18 +1,38 @@
-# Local configuration and generated application state
+# Dependencies
+node_modules/
+
+# Runtime state
+.runtime/
+
+# Environment
 .env
 .env.*
 !.env.example
-node_modules/
+
+# Build output
 dist/
 coverage/
 playwright-report/
 test-results/
-.runtime/
+
+# Local database files outside the standard runtime directory
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
 *.db
+
+# Temporary logs and debug output
 *.log
+server-out.log
+debug.log
+
+# Local endpoint output (from manual curl testing)
+evidence-out.json
+*-out.json
+
+# General temporary workspace files
 tmp/
-.DS_Store
+
+# OS files
 Thumbs.db
+.DS_Store
