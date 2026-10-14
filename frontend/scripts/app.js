@@ -17,15 +17,16 @@
   }
   async function fetchEvidence(fetcher=global.fetch){if(!fetcher)throw new Error('Fetch is unavailable');const response=await fetcher(`${API_BASE}/api/cases/${CASE_ID}/evidence`);if(!response.ok)throw new Error(`Evidence request failed (${response.status})`);return response.json();}
   async function fetchHealth(fetcher=global.fetch){if(!fetcher)throw new Error('Fetch is unavailable');const response=await fetcher(`${API_BASE}/health`);if(!response.ok)throw new Error('Service status is unavailable');return response.json();}
-  async function startReview(mode='replay',fetcher=global.fetch){
+  async function startReview(mode='replay',fetcher=global.fetch,progressId){
     if(!['replay','live'].includes(mode))throw new Error('Unsupported review mode');
-    try{if(!fetcher)throw new Error();const response=await fetcher(`${API_BASE}/api/cases/${CASE_ID}/runs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode})});if(!response.ok)throw new Error();return await response.json();}
+    try{if(!fetcher)throw new Error();const response=await fetcher(`${API_BASE}/api/cases/${CASE_ID}/runs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,...(progressId?{progressId}:{})})});if(!response.ok)throw new Error();return await response.json();}
     catch{throw new Error('The review could not be completed. Please try again.');}
   }
   const startReplay=fetcher=>startReview('replay',fetcher);
   const modeName=mode=>mode==='live'?'Live AI':'Replay';
   const runMode=(run,fallback='replay')=>run?.mode||run?.provider?.mode||fallback;
   function reviewState(run){
+    if(run?.status==='running')return {requiresReview:false,validated:false,label:'Review in progress',badge:'pending'};
     const d=run?.validatedDecision||run?.judgeProposal;
     const requiresReview=[run?.status,d?.status,d?.validationStatus,d?.action,d?.outcome,run?.judgeProposal?.outcome].includes('human_review');
     const validated=Boolean(run?.validatedDecision)&&!requiresReview&&(d.validationStatus==='validated'||d.status==='validated');
@@ -34,15 +35,35 @@
   function factStrip(ev){return `<div class="facts"><div><small>WAITING DURATION</small><strong>${esc(ev.waitSeconds)} seconds</strong></div><div><small>GPS RECORDS</small><strong>${esc(ev.gpsCount)} points</strong></div><div><small>COMMUNICATIONS</small><strong>${esc(ev.communicationCount)} records</strong></div><div><small>FINANCIAL EFFECT</small><strong>Simulation only</strong></div></div>`;}
   function agentCard(title,label,brief){if(!brief)return `<article class="agent-card waiting"><span>${esc(label)}</span><h3>${esc(title)}</h3><p>Waiting to run.</p></article>`;const opposing=brief.strongestOpposingPoint||brief.adverseEvidence?.[0]?.text;return `<article class="agent-card"><span>${esc(label)}</span><h3>${esc(title)}</h3><p>${esc(brief.position||brief.summary||brief.response||'Structured response received.')}</p>${brief.claims?.length?`<h4>Claims</h4><ul>${list(brief.claims)}</ul>`:''}${opposing?`<div class="opposing"><b>Strongest opposing point</b><p>${esc(opposing)}</p></div>`:''}<div class="citation-row">${citations(claimCitations(brief))}</div></article>`;}
   function rebuttal(title,value){if(!value)return '';const concessions=value.preservedConcessions||value.concessions;return `<details><summary>${esc(title)}</summary><p>${esc(value.response||'')}</p>${concessions?.length?`<b>Concessions preserved</b><ul>${list(concessions)}</ul>`:''}<div class="citation-row">${citations(claimCitations(value))}</div></details>`;}
-  function stageList(events){const rows=Array.isArray(events)&&events.length?events:[{stage:'Evidence frozen',status:'complete'},{stage:'Rider Advocate',status:'waiting'},{stage:'Driver Advocate',status:'waiting'},{stage:'Rebuttals',status:'waiting'},{stage:'Judge + validator',status:'waiting'}];return `<ol class="stages">${rows.map((event,index)=>`<li class="${esc(event.status||'complete')}"><span>${String(index+1).padStart(2,'0')}</span><div><b>${esc(event.stage||event.type||event.name||'Review event')}</b><small>${esc(event.message||event.status||'')}</small></div></li>`).join('')}</ol>`;}
+  const reviewStages = [
+    {id:'rider_brief',title:'Rider Advocate',active:'Assessing the rider account against the evidence…',done:'Rider argument prepared.'},
+    {id:'driver_brief',title:'Driver Advocate',active:'Assessing the driver account against the evidence…',done:'Driver argument prepared.'},
+    {id:'rider_rebuttal',title:'Rider response',active:'Reviewing and responding to the driver’s argument…',done:'Rider response completed.'},
+    {id:'driver_rebuttal',title:'Driver response',active:'Reviewing and responding to the rider’s argument…',done:'Driver response completed.'},
+    {id:'judge',title:'Judge',active:'Weighing both arguments and checking policy…',done:'Judge proposal received.'},
+  ];
+  function stageList(events,runStatus){
+    const latest=new Map();
+    for(const event of [...(Array.isArray(events)?events:[])].sort((a,b)=>(a.sequence||0)-(b.sequence||0)))latest.set(event.stage,event.status);
+    const stopped=['failed','human_review','interrupted'].includes(runStatus);
+    const rows=reviewStages.map(stage=>{
+      const status=latest.get(stage.id);
+      const state=['complete','completed','succeeded'].includes(status)?'completed':status==='failed'?'failed':stopped?'stopped':['started','running'].includes(status)?'running':'waiting';
+      const description=state==='completed'?stage.done:state==='running'?stage.active:state==='failed'?'This stage failed. A reviewer is needed.':state==='stopped'?'Review stopped before this stage completed.':'Waiting to start.';
+      return {...stage,state,description};
+    });
+    const completed=rows.filter(row=>row.state==='completed').length,percent=completed*20;
+    const summary=completed===5?'Agent review finished':rows.some(row=>row.state==='failed'||row.state==='stopped')?'Agent review stopped':rows.some(row=>row.state==='running')?'Agents are reviewing the case':'Ready to begin';
+    return `<div class="review-progress"><div class="progress-caption"><strong>${percent}%</strong><span>${summary} · ${completed} of 5 stages complete</span></div><div class="review-progress-track" role="progressbar" aria-label="Agent review progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div></div><ol class="stages">${rows.map((row,index)=>`<li class="${row.state}"><div class="stage-track" aria-hidden="true"><span></span></div><div class="stage-heading"><span class="stage-number">${String(index+1).padStart(2,'0')}</span><b>${row.title}</b><span class="stage-state">${row.state==='completed'?'Complete':row.state==='running'?'In progress':row.state==='failed'?'Failed':row.state==='stopped'?'Stopped':'Queued'}</span></div><small>${row.description}</small></li>`).join('')}</ol>`;
+  }
   function decisionCard(run){
     const d=run.validatedDecision||run.judgeProposal;if(!d)return '';
-    const state=reviewState(run),confidence=Number(d.confidence);
-    return `<section class="card ${state.validated?'decision':'unavailable'}"><div class="case-top"><span class="eyebrow">${state.requiresReview?'HUMAN REVIEW REQUIRED':state.validated?'VALIDATED DECISION':'DECISION PROPOSAL'} · ${modeName(runMode(run)).toUpperCase()}</span><span class="badge ${state.badge}">${state.validated?'Validated':state.label}</span></div><div class="decision-grid"><div><small>DISPOSITION</small><strong>${esc(state.requiresReview?'Human review required':d.dispositionLabel||d.disposition||d.outcome||d.action||'Decision proposed')}</strong></div><div><small>FEE TREATMENT</small><strong>${esc(state.requiresReview?'No automatic change':d.feeTreatment||'No change')}</strong></div><div><small>SIMULATED ADJUSTMENT</small><strong>${money(state.requiresReview?0:d.amountMinor??d.proposedAdjustmentCents)}</strong></div><div><small>${state.validated?'EVIDENCE SUPPORT':'VALIDATION'}</small><strong>${state.validated?`${Math.round((confidence<=1?confidence*100:confidence)||0)}%`:state.requiresReview?'Review required':'Pending'}</strong></div></div><p class="decision-copy">${esc(d.explanation||'')}</p>${d.decisiveFacts?.length?`<h3>Decisive facts</h3><ul>${list(d.decisiveFacts)}</ul>`:''}<div class="citation-row">${citations(d.policyRuleIds||d.policyCitations)}</div><p class="simulation">No real refund, charge or account action was performed.</p></section>`;
+    const state=reviewState(run);
+    return `<section class="card ${state.validated?'decision':'unavailable'}"><div class="case-top"><span class="eyebrow">${state.requiresReview?'HUMAN REVIEW REQUIRED':state.validated?'VALIDATED DECISION':'DECISION PROPOSAL'} · ${modeName(runMode(run)).toUpperCase()}</span><span class="badge ${state.badge}">${state.validated?'Validated':state.label}</span></div><div class="decision-grid"><div><small>DISPOSITION</small><strong>${esc(state.requiresReview?'Human review required':d.dispositionLabel||d.disposition||d.outcome||d.action||'Decision proposed')}</strong></div><div><small>FEE TREATMENT</small><strong>${esc(state.requiresReview?'No automatic change':d.feeTreatment||'No change')}</strong></div><div><small>SIMULATED ADJUSTMENT</small><strong>${money(state.requiresReview?0:d.amountMinor??d.proposedAdjustmentCents)}</strong></div><div><small>VALIDATION</small><strong>${state.validated?'Checks passed':state.requiresReview?'Review required':'Pending'}</strong></div></div><p class="decision-copy">${esc(d.explanation||'')}</p>${d.decisiveFacts?.length?`<h3>Decisive facts</h3><ul>${list(d.decisiveFacts)}</ul>`:''}<div class="citation-row">${citations(d.policyRuleIds||d.policyCitations)}</div><p class="simulation">No real refund, charge or account action was performed.</p></section>`;
   }
   function supportReady(ev,run,mode='replay'){
     const label=modeName(runMode(run,mode)).toUpperCase();
-    return `<section class="card workspace-head"><div><span class="eyebrow">${label} ${run?'RUN':'READY'} · DISP-002</span><h2>No-show charge review</h2><p>Organizer fixture · Evidence-safe projection</p></div><button id="start-review" class="button">${run?'Run again':'Start'} ${mode==='live'?'live AI review':'three-agent replay'} <span>→</span></button></section><section class="card"><div class="case-top"><h2>Evidence snapshot</h2><span class="replay-label">${label}</span></div>${factStrip(ev)}<p class="small">Deterministic code calculates the waiting duration. Agents interpret the record; they do not calculate or execute money.</p></section><section class="card"><div class="case-top"><h2>Review stages</h2><span class="run-status">${esc(run?reviewState(run).label:'Ready')}</span></div>${stageList(run?.events)}</section><section class="card"><h2>Independent advocate briefs</h2><div class="role-grid">${agentCard('Rider Advocate','RIDER',run?.riderBrief)}${agentCard('Driver Advocate','DRIVER',run?.driverBrief)}</div>${rebuttal('Rider Advocate rebuttal',run?.riderRebuttal)}${rebuttal('Driver Advocate rebuttal',run?.driverRebuttal)}</section>${run?.judgeProposal?`<section class="card judge"><span class="eyebrow">JUDGE PROPOSAL</span><h2>${esc(run.judgeProposal.outcome||run.judgeProposal.disposition||run.judgeProposal.action||'Proposed ruling')}</h2><p>${esc(run.judgeProposal.explanation||'')}</p><div class="citation-row">${citations(run.judgeProposal.policyRuleIds)}</div></section>`:''}${decisionCard(run||{})}`;
+    return `<section class="card workspace-head"><div><span class="eyebrow">${label} ${run?'RUN':'READY'} · DISP-002</span><h2>No-show charge review</h2><p>Organizer fixture · Evidence-safe projection</p></div><button id="start-review" class="button">${run?'Run again':'Start'} ${mode==='live'?'live AI review':'three-agent replay'} <span>→</span></button></section><section class="card"><div class="case-top"><h2>Evidence snapshot</h2><span class="replay-label">${label}</span></div>${factStrip(ev)}<p class="small">Deterministic code calculates the waiting duration. Agents interpret the record; they do not calculate or execute money.</p></section><section class="card"><div class="case-top"><h2>Review stages</h2><span class="run-status">${esc(run?reviewState(run).label:'Ready')}</span></div>${stageList(run?.events,run?.status)}</section><section class="card"><h2>Independent advocate briefs</h2><div class="role-grid">${agentCard('Rider Advocate','RIDER',run?.riderBrief)}${agentCard('Driver Advocate','DRIVER',run?.driverBrief)}</div>${rebuttal('Rider Advocate rebuttal',run?.riderRebuttal)}${rebuttal('Driver Advocate rebuttal',run?.driverRebuttal)}</section>${run?.judgeProposal?`<section class="card judge"><span class="eyebrow">JUDGE PROPOSAL</span><h2>${esc(run.judgeProposal.outcome||run.judgeProposal.disposition||run.judgeProposal.action||'Proposed ruling')}</h2><p>${esc(run.judgeProposal.explanation||'')}</p><div class="citation-row">${citations(run.judgeProposal.policyRuleIds)}</div></section>`:''}${decisionCard(run||{})}`;
   }
   function riderReady(ev,run,mode='replay'){
     const d=run&&(run.validatedDecision||run.judgeProposal),label=modeName(runMode(run,mode)).toUpperCase();
@@ -52,25 +73,30 @@
   }
   function errorCard(message){return `<section class="card unavailable"><span class="eyebrow">BACKEND UNAVAILABLE</span><h2>The local demo service is not responding.</h2><p>${esc(message)}</p><p>Start the backend on port 3001, then reload. No case action was taken.</p><button class="quiet" onclick="location.reload()">Try again</button></section>`;}
   function boot(){
-    const $=selector=>document.querySelector(selector);let evidence,run,mode='replay',liveAvailable=false,running=false;
-    const renderView=()=>{const active=location.hash==='#support'?'support':'rider';for(const name of ['rider','support']){$(`#${name}-view`).hidden=name!==active;$(`#${name}-link`).setAttribute('aria-current',name===active?'page':'false');}};
+    const $=selector=>document.querySelector(selector);let evidence,run,progressRun,mode='replay',liveAvailable=false,running=false;
+    const renderView=()=>{const active=['#rider','#driver','#support'].includes(location.hash)?location.hash.slice(1):'rider';for(const name of ['rider','driver','support']){$(`#${name}-view`).hidden=name!==active;$(`#${name}-link`).setAttribute('aria-current',name===active?'page':'false');}};
     const render=()=>{
       $('#review-mode-label').textContent=mode==='live'?'LIVE AI DEMO':'REPLAY DEMO';$('#support-mode-label').textContent=`INTERNAL SUPPORT · ${modeName(mode).toUpperCase()}`;
       $('#review-mode-help').textContent=mode==='live'?'Uses ADP when you click Start. Live requests consume your provider allowance. No real payment action.':`Replay uses saved responses and no model calls.${liveAvailable?' Live AI is available.':' Live AI is unavailable.'}`;
-      if(!evidence)return;$('#support-content').innerHTML=supportReady(evidence,run,mode);$('#rider-content').innerHTML=riderReady(evidence,run,mode);
+      if(!evidence)return;$('#support-content').innerHTML=supportReady(evidence,run||progressRun,mode);$('#rider-content').innerHTML=riderReady(evidence,run,mode);
       const state=run?reviewState(run):{badge:'pending',label:'Ready'};$('#queue-badge').className=`badge ${state.badge}`;$('#queue-badge').textContent=state.label;
       if(running&&!run){$('#start-review').disabled=true;$('#start-review').textContent=`Running ${modeName(mode).toLowerCase()}…`;$('#queue-badge').textContent='Running';}
     };
     global.addEventListener('hashchange',renderView);renderView();
     fetchHealth().then(health=>{liveAvailable=health.liveAvailable===true;$('#live-mode-option').disabled=!liveAvailable;render();}).catch(()=>{liveAvailable=false;render();});
     fetchEvidence().then(payload=>{evidence=evidenceView(payload);$('#queue-detail').textContent=`${evidence.waitSeconds}-second recorded wait`;render();}).catch(()=>{$('#support-content').innerHTML=errorCard('Case evidence could not be loaded.');$('#rider-content').innerHTML=errorCard('Case evidence could not be loaded.');$('#queue-detail').textContent='Backend unavailable';});
-    $('#review-mode').addEventListener('change',event=>{if(running)return;mode=event.target.value==='live'&&liveAvailable?'live':'replay';event.target.value=mode;run=undefined;render();});
+    $('#review-mode').addEventListener('change',event=>{if(running)return;mode=event.target.value==='live'&&liveAvailable?'live':'replay';event.target.value=mode;run=undefined;progressRun=undefined;render();});
     document.addEventListener('click',async event=>{
       const button=event.target.closest('#start-review');if(!button||!evidence||running||(mode==='live'&&!liveAvailable))return;
-      running=true;run=undefined;render();const activeButton=$('#start-review');activeButton.disabled=true;activeButton.textContent=`Running ${modeName(mode).toLowerCase()}…`;$('#review-mode').disabled=true;$('#queue-badge').textContent='Running';
-      try{run=await startReview(mode);render();}
-      catch{running=false;render();$('#support-content').insertAdjacentHTML('afterbegin',`<div class="notice" role="alert"><b>${modeName(mode)} review could not be completed.</b> Please try again. No payment or account action was taken.</div>`);$('#start-review').textContent=`Try ${modeName(mode).toLowerCase()} again`;$('#queue-badge').textContent='Review failed';$('#queue-badge').className='badge review';}
-      finally{running=false;$('#review-mode').disabled=false;}
+      running=true;run=undefined;progressRun={status:'running',mode,events:[]};render();const activeButton=$('#start-review');activeButton.disabled=true;activeButton.textContent=`Running ${modeName(mode).toLowerCase()}…`;$('#review-mode').disabled=true;$('#queue-badge').textContent='Running';
+      const progressId=global.crypto?.randomUUID();let poll,finished=false,polling=false;
+      if(progressId)poll=global.setInterval(async()=>{
+        if(polling||finished)return;polling=true;
+        try{const response=await global.fetch(`${API_BASE}/api/cases/${CASE_ID}/progress/${progressId}`);if(response.ok){const value=await response.json();if(!finished){progressRun=value;render();}}}catch{}finally{polling=false;}
+      },1000);
+      try{run=await startReview(mode,global.fetch,progressId);finished=true;render();}
+      catch{finished=true;running=false;progressRun={...progressRun,status:'failed'};render();$('#support-content').insertAdjacentHTML('afterbegin',`<div class="notice" role="alert"><b>${modeName(mode)} review could not be completed.</b> Please try again. No payment or account action was taken.</div>`);$('#start-review').textContent=`Try ${modeName(mode).toLowerCase()} again`;$('#queue-badge').textContent='Review failed';$('#queue-badge').className='badge review';}
+      finally{finished=true;if(poll!==undefined)global.clearInterval(poll);running=false;$('#review-mode').disabled=false;}
     });
   }
   const api={esc,money,evidenceView,fetchEvidence,fetchHealth,startReview,startReplay,reviewState,factStrip,agentCard,stageList,decisionCard,supportReady,riderReady,errorCard};global.FareEnoughUI=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;if(global.document)boot();

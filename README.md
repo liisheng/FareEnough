@@ -6,9 +6,10 @@ This baseline implements the seeded DISP-002 no-show dispute with an auditable r
 
 ## Run the local demo
 
-In one terminal, start the backend:
+After installing dependencies, build and start the backend (startup applies database migrations):
 
 ```text
+npm run build
 npm start
 ```
 
@@ -18,16 +19,30 @@ In another terminal, start the frontend and open http://127.0.0.1:3000:
 npm run frontend
 ```
 
-The responsive workspace has two views:
+The combined responsive workspace has three views:
 
-- Rider outcome: a concise explanation, fee treatment, decisive facts and policy citations.
-- Support review: the 480-second derived fact, progress events, separate advocate briefs, rebuttals, Judge proposal and validated result.
+- Rider: submit a complaint for the suggested organizer trip and see its saved status and outcome.
+- Driver: submit an immutable account for an assigned case, with a neutral category summary and own-account export.
+- Support: inspect both accounts, explicitly start replay or Live AI, watch persisted progress, and inspect briefs, rebuttals, Judge proposal and validated result.
 
-Replay remains selected by default. The support view enables Live AI only when the backend reports configured ADP access. Live runs send the sanitized organizer fixture to Tencent ADP; no model call starts on page load or mode selection. The result displays the actual run mode, and cases needing human review are labeled accordingly.
+Cases, accounts, progress and results are saved in SQLite and restored after refresh. Demo role sessions enforce assigned ownership and role-specific responses on the backend; the persona switch intentionally lets a local presenter assume any demo role and is not production sign-in. Rider and driver APIs/exports omit the opposing narrative and internal model artifacts. Original browser-local requests are not automatically uploaded or deleted.
+
+### Connected walkthrough
+
+1. Open Rider. A unique demo trip reference is filled automatically. Select No-show charge and submit your account. Each reference represents an independent copy of the organizer fixture; use New demo trip for another test. Reusing a reference opens its existing case instead of duplicating it.
+2. Open Driver. Select that case and submit the driver's account.
+3. Open Support. Select the submitted case in the queue, choose Live AI (requires configured ADP) or Replay, and click Start.
+4. Support shows progress and all five artifacts: two briefs, two rebuttals and the Judge proposal. Return to Rider or Driver to see the saved, role-scoped outcome. Refresh retains the case and result.
+
+Live review sends both new statements plus the matching organizer evidence to all three agents. Submitted-case replay is an offline pipeline exercise: it acknowledges the statements and requests human review rather than applying the original fixture's prerecorded ruling to new accounts. The separate original DISP-002 walkthrough still supports its original replay ruling.
+
+Unknown trips, route disputes and safety-flagged cases are saved for human review without model execution. Automatic review requires the known no-show trip and both accounts. Full route policy coverage and a manual reviewer disposition workflow remain unimplemented. Missing responses do not imply fault. Completed cases cannot be adjudicated again; failed/interrupted or review-required cases can be retried explicitly. A server restart marks in-flight cases for review without automatically resuming model calls.
+
+Replay remains selected by default. The support view enables Live AI only when the backend reports configured ADP access. No model call starts on page load, intake, driver submission or mode selection. The result displays the actual run mode, and cases needing human review are labeled accordingly.
 
 ### Connect published ADP applications
 
-Copy `.env.example` to `backend/.env` (ignored by Git). Set `MODEL_PROVIDER=adp`, fill `ADP_RIDER_APP_KEY`, `ADP_DRIVER_APP_KEY`, and `ADP_JUDGE_APP_KEY`, and set `AI_MODE=live` when ready to enable external calls. Never put AppKeys in frontend files, screenshots, logs, or commits. Configuration always loads `backend/.env`, including when launched from another directory. Relative database paths still resolve against the process working directory; use the npm scripts from the project root consistently.
+Copy `.env.example` to `backend/.env` (ignored by Git). Set `MODEL_PROVIDER=adp`, fill `ADP_RIDER_APP_KEY`, `ADP_DRIVER_APP_KEY`, and `ADP_JUDGE_APP_KEY`, and set `AI_MODE=live` when ready to enable external calls. Never put AppKeys in frontend files, screenshots, logs, or commits. Configuration prefers `backend/.env` and falls back to the repository root `.env` when that file is absent, independent of launch directory. Existing process environment variables take precedence. Relative database paths still resolve against the process working directory; use the npm scripts from the project root consistently.
 
 Run `npm run build`, then `npm start` and `npm run frontend` in separate terminals. Select Live AI in Support review and click Start. Each run makes at most five ADP calls with separate conversations: two briefs, two rebuttals, and one Judge proposal. Every call receives the full case evidence and selected policy; only the appropriate prior arguments are included. The repository prompt is supplied through ADP's `SystemRole` parameter.
 
@@ -43,9 +58,10 @@ Frontend files are organized as follows:
 
 ```text
 frontend/
-  index.html          Rider and support workspace shells
+  index.html          Rider, driver and support workspace shells
   styles/demo.css     Replay workspace styling
-  scripts/app.js      Evidence loading, replay trigger and result rendering
+  scripts/app.js      Seeded evidence loading, replay/live trigger and results
+  scripts/participation.js  API-backed intake, responses, progress and outcomes
   assets/             Reserved for images and other static assets
   serve.mjs           Local-only HTTP server
 ```
@@ -57,7 +73,7 @@ frontend/
 
 The agreed delivery is a live demonstration running locally. Rider and driver participation is included under the 12 October scope amendment. Public hosting, external notifications, real payment execution, and voice integration remain outside the MVP. Model API calls may still require internet access and separate credentials or credits.
 
-Run `npm run test:frontend` for UI contract and rendering checks. These checks use a DOM stub and do not replace browser or access-control testing.
+Run `npm run test:frontend` for seeded UI contract and rendering checks. `npm test` also tests the actual participation scripts against Fastify and SQLite, including intake, response, all five controlled provider calls and refresh recovery, plus backend role/privacy and failure tests. Script tests use a DOM stub and do not replace visual browser testing or live model evaluation. Automated tests never load local credentials or call ADP.
 
 The hackathon brief requires genuine CodeBuddy or WorkBuddy usage and evidence of that usage. This documentation does not satisfy that requirement by itself. See the submission checklist in [the SRS](SRS.md#18-hackathon-deliverables).
 
@@ -107,6 +123,13 @@ All commands are Windows-compatible and run from the project root.
 | GET | `/health` | Returns `{ status, database, provider, timestamp }`. Does not trigger model calls. |
 | GET | `/api/cases/DISP-002/evidence` | Returns a safe case/evidence projection with derived facts. Strips historical rider/driver profile data. |
 | POST | `/api/cases/DISP-002/runs` | Runs an explicit `{ "mode": "replay" }` or configured `{ "mode": "live" }` review, validates it and persists its audit trail. |
+| POST | `/api/workspace/session` | Creates a local demo role session; disabled outside demo mode. |
+| GET | `/api/workspace/trips` | Lists the rider's supported organizer demo trip. |
+| POST | `/api/workspace/trips` | Allocates a unique organizer-backed demo trip reference; retries with the same request key return the same reference. |
+| GET / POST | `/api/workspace/cases` | Lists role-scoped cases or creates a rider complaint with duplicate protection. |
+| GET | `/api/workspace/cases/:id` | Restores the permitted case state; support also receives progress and internal artifacts. |
+| POST | `/api/workspace/cases/:id/driver-response` | Saves the assigned driver's immutable response. |
+| POST | `/api/cases/:id/runs` | Support-only review of a submitted supported case. The browser polls saved state while the request runs. |
 
 ### Three-agent baseline
 

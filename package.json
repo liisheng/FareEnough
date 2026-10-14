@@ -13,7 +13,7 @@
     "db:migrate": "npm run db:migrate --workspace backend",
     "seed": "npm run seed --workspace backend",
     "test": "npm run test --workspace backend",
-    "test:frontend": "node --test frontend/tests/stakeholder-flow.test.cjs",
+    "test:frontend": "node --test frontend/tests/*.test.cjs",
     "frontend": "node frontend/serve.mjs"
   },
   "engines": {

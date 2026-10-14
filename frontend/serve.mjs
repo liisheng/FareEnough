@@ -6,7 +6,9 @@ const files = new Map([
   ['/index.html', ['index.html', 'text/html; charset=utf-8']],
   ['/styles/styles.css', ['styles/styles.css', 'text/css; charset=utf-8']],
   ['/styles/demo.css', ['styles/demo.css', 'text/css; charset=utf-8']],
+  ['/styles/progress.css', ['styles/progress.css', 'text/css; charset=utf-8']],
   ['/scripts/app.js', ['scripts/app.js', 'text/javascript; charset=utf-8']],
+  ['/scripts/participation.js', ['scripts/participation.js', 'text/javascript; charset=utf-8']],
 ]);
 const server = createServer(async (request, response) => {
   const file = files.get(new URL(request.url, 'http://localhost').pathname);

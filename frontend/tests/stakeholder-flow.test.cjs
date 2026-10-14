@@ -12,6 +12,34 @@ test('normalizes the seeded evidence projection and renders deterministic facts'
   assert.match(ui.factStrip(ev),/8 points/);
 });
 
+test('stage progress updates five items from queued through active to complete',()=>{
+  const stages=['rider_brief','driver_brief','rider_rebuttal','driver_rebuttal','judge'];
+  const idle=ui.stageList([]);
+  assert.equal((idle.match(/<li class=/g)||[]).length,5);
+  assert.match(idle,/aria-valuenow="0"/);
+  const active=ui.stageList([{stage:'rider_brief',status:'started',sequence:1},{stage:'driver_brief',status:'started',sequence:2}],'running');
+  assert.equal((active.match(/<li class="running"/g)||[]).length,2);
+  assert.match(active,/Assessing the rider account/);
+  const events=stages.flatMap((stage,i)=>[{stage,status:'started',sequence:i*2+1},{stage,status:'completed',sequence:i*2+2}]);
+  const partial=ui.stageList(events.slice(0,5),'running');
+  assert.match(partial,/aria-valuenow="40"/);
+  assert.match(partial,/Reviewing and responding to the driver/);
+  const done=ui.stageList(events,'human_review');
+  assert.equal((done.match(/<li class=/g)||[]).length,5);
+  assert.equal((done.match(/<li class="completed"/g)||[]).length,5);
+  assert.match(done,/aria-valuenow="100"/);
+  assert.match(done,/Judge proposal received/);
+  assert.doesNotMatch(done,/Waiting to start|In progress/);
+});
+
+test('failed or interrupted work never appears fully complete or keeps animating',()=>{
+  const html=ui.stageList([{stage:'rider_brief',status:'completed'},{stage:'driver_brief',status:'started'},{stage:'rider_rebuttal',status:'failed'}],'human_review');
+  assert.match(html,/aria-valuenow="20"/);
+  assert.match(html,/Agent review stopped/);
+  assert.match(html,/This stage failed/);
+  assert.doesNotMatch(html,/<li class="running"|100%/);
+});
+
 test('API helpers request the evidence and replay endpoints with the expected contract',async()=>{
   const requests=[];
   const fetcher=async(url,options={})=>{requests.push({url,options});return {ok:true,json:async()=>({ok:true})};};
@@ -46,7 +74,7 @@ test('renders advocate separation, rebuttals, citations and a validated simulate
   assert.match(html,/Rider Advocate/);assert.match(html,/Driver Advocate/);
   assert.match(html,/Rider Advocate rebuttal/);assert.match(html,/Driver Advocate rebuttal/);
   assert.match(html,/CHAT-01/);assert.match(html,/GPS-05/);assert.match(html,/POL-1/);
-  assert.match(html,/VALIDATED DECISION/);assert.match(html,/S\$0\.00/);assert.match(html,/100%/);
+  assert.match(html,/VALIDATED DECISION/);assert.match(html,/S\$0\.00/);assert.match(html,/Checks passed/);
   assert.match(html,/No real refund, charge or account action/);
 });
 
@@ -74,11 +102,13 @@ function browserHarness({liveAvailable=true,response=run}={}){
   const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
   const nodes=new Map(),listeners={},requests=[];
   const node=selector=>{if(!nodes.has(selector))nodes.set(selector,{value:selector==='#review-mode'?'replay':'',disabled:selector==='#live-mode-option',textContent:'',innerHTML:'',listeners:{},setAttribute(){},addEventListener(name,fn){this.listeners[name]=fn;},insertAdjacentHTML(_position,html){this.innerHTML=html+this.innerHTML;}});return nodes.get(selector);};
-  const document={querySelector:node,addEventListener:(name,fn)=>{listeners[name]=fn;}};
+  const document={querySelector:node,addEventListener:(name,fn)=>{(listeners[name]??=[]).push(fn);}};
   const fetch=async(url,options={})=>{requests.push({url,options});return {ok:true,json:async()=>url.endsWith('/health')?{mode:'live',liveAvailable}:url.endsWith('/evidence')?evidencePayload:response};};
   const window={document,fetch,addEventListener(){}};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../scripts/app.js'),'utf8'),{window,document,location:{hash:'#support'}});
-  return {node,requests,select:async mode=>{const select=node('#review-mode');select.value=mode;await select.listeners.change({target:select});},click:()=>listeners.click({target:{closest:selector=>selector==='#start-review'?node(selector):null}})};
+  const location={hash:'#support'};
+  const context=vm.createContext({window,document,location});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../scripts/app.js'),'utf8'),context);
+  return {node,requests,select:async mode=>{const select=node('#review-mode');select.value=mode;await select.listeners.change({target:select});},click:()=>Promise.all(listeners.click.map(fn=>fn({target:{closest:selector=>selector==='#start-review'?node(selector):null}})))};
 }
 
 test('page startup and mode selection never start a model call; the explicit action uses live mode',async()=>{

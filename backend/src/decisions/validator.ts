@@ -58,8 +58,9 @@ function review(input: DecisionValidationInput, reasons: string[], proposal: unk
  * Treats model output as an untrusted proposal. Any malformed, uncited, or
  * deterministically inconsistent proposal is stopped for human review.
  */
-export function validateDecision(input: DecisionValidationInput): DecisionResult {
-  if (input.caseId !== 'DISP-002') {
+export interface TrustedPolicyContext { profileId: string; evidenceIds: ReadonlySet<string> }
+export function validateDecision(input: DecisionValidationInput, context?: TrustedPolicyContext): DecisionResult {
+  if (input.caseId !== 'DISP-002' && context?.profileId !== 'organizer-disp002-v1') {
     return review(input, ['UNSUPPORTED_CASE'], input.proposal);
   }
 
@@ -73,7 +74,7 @@ export function validateDecision(input: DecisionValidationInput): DecisionResult
   const evidenceCitations = unique(proposal.evidenceCitations);
   const policyCitations = unique(proposal.policyCitations);
 
-  if (evidenceCitations.some((id) => !DISP002_EVIDENCE_IDS.has(id))) {
+  if (evidenceCitations.some((id) => !(context?.evidenceIds ?? DISP002_EVIDENCE_IDS).has(id))) {
     reasons.push('UNKNOWN_EVIDENCE_CITATION');
   }
   if (policyCitations.some((id) => !DISP002_POLICY_RULE_IDS.has(id))) {
@@ -126,12 +127,13 @@ export function validateAgentJudgeProposal(
   caseId: string,
   proposal: AgentJudgeProposalInput,
   waitingDuration: DecisionValidationInput['waitingDuration'],
+  context?: TrustedPolicyContext,
 ): DecisionResult {
   if (proposal.outcome === 'human_review' || (proposal.uncertainty?.length ?? 0) > 0) {
     return {
       status: 'human_review', caseId, disposition: null, action: 'human_review',
       amountMinor: 0, currency: 'SGD',
-      evidenceCitations: unique(proposal.evidenceIds.filter((id) => DISP002_EVIDENCE_IDS.has(id))),
+      evidenceCitations: unique(proposal.evidenceIds.filter((id) => (context?.evidenceIds ?? DISP002_EVIDENCE_IDS).has(id))),
       policyCitations: unique(proposal.policyRuleIds.filter((id) => DISP002_POLICY_RULE_IDS.has(id))),
       reasonCodes: [proposal.outcome === 'human_review' ? 'AGENT_REQUESTED_HUMAN_REVIEW' : 'AGENT_REPORTED_MATERIAL_UNCERTAINTY'],
       proposal,
@@ -150,5 +152,5 @@ export function validateAgentJudgeProposal(
       policyCitations: proposal.policyRuleIds,
       rationale: proposal.explanation,
     },
-  });
+  }, context);
 }

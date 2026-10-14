@@ -61,6 +61,20 @@ describe('POST case run', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('exposes neutral fixture progress for one run without starting another review', async () => {
+    const progressId = '11111111-1111-4111-8111-111111111111';
+    const url = `/api/cases/DISP-002/progress/${progressId}`;
+    expect((await app.inject({url})).statusCode).toBe(404);
+    const response = await app.inject({method:'POST',url:'/api/cases/DISP-002/runs',payload:{mode:'replay',progressId}});
+    expect(response.statusCode).toBe(201);
+    const progress = (await app.inject({url})).json();
+    expect(progress.status).toBe('completed');
+    expect(progress.events).toHaveLength(10);
+    expect(Object.keys(progress).sort()).toEqual(['events','mode','status']);
+    expect((await app.inject({method:'POST',url:'/api/cases/DISP-002/runs',payload:{mode:'replay',progressId}})).statusCode).toBe(409);
+    expect(db.prepare('SELECT count(*) AS n FROM agent_runs').get()).toEqual({n:1});
+  });
+
   async function enableLive(factory: () => any, sessionLimit = '60') {
     await app.close();
     app = Fastify({ logger: false });

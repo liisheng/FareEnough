@@ -1,5 +1,11 @@
 # FareEnough implementation handoff
 
+## Connected implementation update — 14 October 2026
+
+The integration branch now persists rider intake, assigned driver responses, demo sessions, progress and outcomes in SQLite. The frontend sends supported submitted cases through the existing five-call coordinator and ADP adapter. Both new narratives are included as unverified evidence. Role-scoped APIs exclude the opposing account and internal artifacts from party results. The root `.env` is accepted when `backend/.env` is absent. See README's Connected walkthrough for current operation.
+
+Submitted-case replay exercises the pipeline and escalates; it does not assess new statements. Only the known organizer no-show trip has automatic policy coverage. Route disputes, unknown trips and safety flags are persisted for review. Manual reviewer dispositions, production authentication and full SRS acceptance coverage remain outstanding. The older browser-only and initial-repository descriptions below are historical, not the current implementation state.
+
 ## Scope update — 12 October 2026
 
 The user approved direct rider and driver participation, superseding the earlier no-driver-portal scope below. The frontend now has Rider, Driver, and Support demo personas. A rider opens a local case; its assigned demo driver responds to that same case; support sees both narratives. Each party view/export includes only their own narrative and a neutral shared status. Missing responses do not establish fault. Browser-local storage is a demonstration, not authentication or durable backend persistence. Backend integration must enforce driver assignment, immutable submissions, role-scoped projections, and duplicate protection. No external notifications or live AI runs have been added.

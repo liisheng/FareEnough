@@ -5,6 +5,8 @@ import { runRoutes } from './routes/runs.js';
 import { getDb } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { HOST, PORT } from './config.js';
+import { workspaceRoutes } from './routes/workspace.js';
+import { recoverInterruptedCases } from './workspace.js';
 
 // ---------------------------------------------------------------------------
 // Fastify server — creates the instance, registers routes, runs migrations
@@ -15,7 +17,7 @@ export async function buildServer(): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({
     logger: {
       level: 'info',
-      redact: ['*.MODEL_API_KEY', '*.SESSION_SECRET', '*.ADP_RIDER_APP_KEY', '*.ADP_DRIVER_APP_KEY', '*.ADP_JUDGE_APP_KEY', '*.AppKey'],
+      redact: ['req.headers.authorization', '*.MODEL_API_KEY', '*.SESSION_SECRET', '*.ADP_RIDER_APP_KEY', '*.ADP_DRIVER_APP_KEY', '*.ADP_JUDGE_APP_KEY', '*.AppKey'],
     },
   });
 
@@ -24,7 +26,7 @@ export async function buildServer(): Promise<ReturnType<typeof Fastify>> {
     if (origin === 'http://127.0.0.1:3000' || origin === 'http://localhost:3000') {
       reply.header('Access-Control-Allow-Origin', origin);
       reply.header('Vary', 'Origin');
-      reply.header('Access-Control-Allow-Headers', 'Content-Type');
+      reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     }
     if (request.method === 'OPTIONS') return reply.code(204).send();
@@ -33,10 +35,12 @@ export async function buildServer(): Promise<ReturnType<typeof Fastify>> {
   // Run migrations on startup so the database is always ready.
   const db = getDb();
   runMigrations(db);
+  recoverInterruptedCases();
 
   await app.register(healthRoutes);
   await app.register(caseRoutes);
   await app.register(runRoutes);
+  await app.register(workspaceRoutes);
 
   return app;
 }

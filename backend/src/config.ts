@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 
 // ---------------------------------------------------------------------------
 // Configuration — reads environment variables with safe defaults.
@@ -53,9 +54,13 @@ export function parseConfig(env: Record<string, string | undefined> = process.en
 // breaks when dotenv is not installed or .env is absent.
 try {
   const { config } = await import('dotenv');
-  // Resolve consistently for both src/ and dist/, regardless of launch cwd.
-  // Unit tests deliberately do not load local credentials.
-  if (process.env.NODE_ENV !== 'test') config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
+  // Prefer backend/.env; accept the root .env used by the local workspace.
+  // Unit tests deliberately do not load local credentials. Process variables win.
+  if (process.env.NODE_ENV !== 'test') {
+    const backendEnv = fileURLToPath(new URL('../.env', import.meta.url));
+    const rootEnv = fileURLToPath(new URL('../../.env', import.meta.url));
+    config({ path: existsSync(backendEnv) ? backendEnv : rootEnv });
+  }
 } catch {
   // dotenv not available or no .env file — proceed with process.env only.
 }

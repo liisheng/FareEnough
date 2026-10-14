@@ -12,8 +12,11 @@ import { AdpModelProvider, AdpProviderError } from '../providers/adp-provider.js
 import type { ModelProvider } from '../providers/model-provider.js';
 import type { SafeAgentEvent } from '../agents/schemas.js';
 import { config, isAdpConfigured, type Env } from '../config.js';
+import { findWorkspaceCase, requireSession, workspaceProjection } from '../workspace.js';
+import { createCaseEvidenceTools } from '../tools/case-evidence-tools.js';
+import { SubmittedReplayProvider } from '../providers/submitted-replay-provider.js';
 
-const RunBodySchema = z.object({ mode: z.enum(['replay', 'live']) }).strict();
+const RunBodySchema = z.object({ mode: z.enum(['replay', 'live']), progressId: z.string().uuid().optional() }).strict();
 
 export interface RunRoutesOptions {
   env?: Env;
@@ -40,7 +43,6 @@ function displayDecision(
     feeTreatment: validated
       ? result.action === 'uphold_fee' ? 'Existing fee upheld' : 'Existing fee reversed'
       : 'No automatic change',
-    confidence: validated ? 1 : 0,
     decisiveFacts,
     policyRuleIds: result.policyCitations,
     explanation,
@@ -51,18 +53,34 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
   const env = options.env ?? config;
   let liveBusy = false;
   let reservedCalls = 0;
+  // Original fixture walkthroughs have no workspace case to poll. Expose only
+  // neutral stage events under an opaque, client-generated run identifier.
+  const fixtureProgress = new Map<string, {status:string; mode:string; events:SafeAgentEvent[]}>();
+  app.get('/api/cases/DISP-002/progress/:progressId', async (request, reply) => {
+    const progress = fixtureProgress.get((request.params as {progressId:string}).progressId);
+    return progress ?? reply.code(404).send({ error: 'Progress unavailable' });
+  });
   app.post('/api/cases/:id/runs', async (request, reply) => {
     if (request.headers.origin && !['http://127.0.0.1:3000', 'http://localhost:3000'].includes(request.headers.origin)) {
       return reply.code(403).send({ error: 'Origin is not allowed' });
     }
     const { id } = request.params as { id: string };
-    if (id !== 'DISP-002') return reply.code(404).send({ error: 'Case not found', caseId: id });
+    const submitted = id === 'DISP-002' ? undefined : findWorkspaceCase(id);
+    if (id !== 'DISP-002') {
+      if (!requireSession(request, reply, 'support')) return;
+      if (!submitted) return reply.code(404).send({ error: 'Case not found' });
+      if (!submitted.supported || !submitted.driver_account) return reply.code(409).send({ error: 'Review requires a supported trip and both party accounts.' });
+      if (submitted.status === 'running') return reply.code(409).send({ error: 'This case is already running.' });
+      if (submitted.status === 'completed') return reply.code(200).send(JSON.parse(submitted.result!));
+    }
 
     const body = RunBodySchema.safeParse(request.body);
     if (!body.success) {
       return reply.code(400).send({ error: 'Choose explicit replay or live mode' });
     }
     const live = body.data.mode === 'live';
+    const progressId = !submitted ? body.data.progressId : undefined;
+    if (progressId && fixtureProgress.has(progressId)) return reply.code(409).send({ error: 'This review request has already started.' });
     if (live && !isAdpConfigured(env)) return reply.code(400).send({ error: 'Live ADP is not configured' });
     if (live && liveBusy) return reply.code(409).send({ error: 'A live review is already running' });
     const sessionLimit = boundedInt(env.MAX_MODEL_CALLS_PER_SESSION, 60, 60);
@@ -70,7 +88,7 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       return reply.code(429).send({ error: 'Live review call limit reached for this server session' });
     }
 
-    const projection = projectCaseEvidence(loadDisp002Fixture());
+    const projection = submitted ? workspaceProjection(submitted) : projectCaseEvidence(loadDisp002Fixture());
     const waitFact = projection.derivedFacts.find((fact) => fact.id === 'derived_wait_duration');
     if (!waitFact || typeof waitFact.value !== 'number') {
       return reply.code(500).send({ error: 'Waiting-duration fact is unavailable' });
@@ -79,6 +97,15 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
     const runId = `run-${randomUUID()}`;
     const startedAt = new Date().toISOString();
     const events: SafeAgentEvent[] = [];
+    if (progressId) {
+      if (fixtureProgress.size >= 100) {
+        const oldest = [...fixtureProgress].find(([,progress]) => progress.status !== 'running');
+        if (oldest) fixtureProgress.delete(oldest[0]);
+        else return reply.code(429).send({ error: 'Too many active reviews.' });
+      }
+      fixtureProgress.set(progressId, {status:'running',mode:body.data.mode,events});
+    }
+    if (submitted) getDb().prepare("UPDATE workspace_cases SET status = 'running', reason = 'Three-agent review in progress.', run_id = ?, run_mode = ?, events = '[]', result = NULL WHERE case_id = ?").run(runId, body.data.mode, id);
     if (live) { liveBusy = true; reservedCalls += 5; }
     let provider: ModelProvider | undefined;
     try {
@@ -89,14 +116,17 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       chatUrl: env.ADP_CHAT_URL,
       callTimeoutMs: boundedInt(env.MODEL_CALL_TIMEOUT_MS, 60000, 120000),
       runTimeoutMs: boundedInt(env.RUN_TIMEOUT_MS, 240000, 480000),
-    })) : new ReplayModelProvider();
-    const run = await runThreeAgentReview(projection, provider, { runId, onEvent(event) { events.push(event); } });
+    })) : submitted ? new SubmittedReplayProvider() : new ReplayModelProvider();
+    const run = await runThreeAgentReview(projection, provider, { runId, onEvent(event) {
+      events.push(event);
+      if (submitted) getDb().prepare('UPDATE workspace_cases SET events = ? WHERE case_id = ?').run(JSON.stringify(events), id);
+    } });
     const decision = validateAgentJudgeProposal(id, run.judgeProposal, {
       value: waitFact.value,
       status: waitFact.status,
       sourceEvidenceIds: waitFact.sourceEvidenceIds,
       policyRuleIds: waitFact.policyRuleIds,
-    });
+    }, submitted ? { profileId: projection.policyProfile.profileId, evidenceIds: new Set(createCaseEvidenceTools(projection).getEvidence().map(e => e.id)) } : undefined);
     const completedAt = new Date().toISOString();
     const artifacts = [
       ['rider_brief', 'rider_advocate', run.riderBrief],
@@ -109,11 +139,17 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       .update(JSON.stringify({ caseId: id, mode: body.data.mode, projection, provider: provider.id }))
       .digest('hex');
 
+    const response = {
+      ...run, mode: body.data.mode,
+      status: decision.status === 'validated' ? 'completed' : 'human_review',
+      validatedDecision: displayDecision(decision, run.judgeProposal.explanation, run.judgeProposal.findings.map(f => f.text)),
+    };
+    getDb().transaction(() => {
     persistCompletedRun(getDb(), {
       runId,
       decisionId: `${runId}:decision`,
       caseId: id,
-      provider: provider.id,
+      provider: run.provider.id,
       mode: body.data.mode,
       inputHash: `sha256:${inputHash}`,
       startedAt,
@@ -132,17 +168,10 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       })),
       decision,
     });
-
-    return reply.code(201).send({
-      ...run,
-      mode: body.data.mode,
-      status: decision.status === 'validated' ? 'completed' : 'human_review',
-      validatedDecision: displayDecision(
-        decision,
-        run.judgeProposal.explanation,
-        run.judgeProposal.findings.map((finding) => finding.text),
-      ),
-    });
+    if (submitted) getDb().prepare('UPDATE workspace_cases SET status = ?, reason = ?, result = ? WHERE case_id = ?').run(response.status, decision.status === 'validated' ? 'Review completed; any financial outcome is simulated.' : 'Human review required; no automatic adjustment.', JSON.stringify(response), id);
+    })();
+    if (progressId) fixtureProgress.get(progressId)!.status = response.status;
+    return reply.code(201).send(response);
     } catch (error) {
       provider?.abort?.();
       // Never return or persist upstream errors, prompts, keys, or invalid model output.
@@ -160,6 +189,8 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
         const insert = db.prepare('INSERT INTO run_events (event_id, run_id, sequence, event_type, payload) VALUES (?, ?, ?, ?, ?)');
         for (const event of events) insert.run(`${runId}:event:${event.sequence}`, runId, event.sequence, `${event.stage}_${event.status}`, JSON.stringify(event));
       })();
+      if (submitted) getDb().prepare("UPDATE workspace_cases SET status = 'human_review', reason = ? WHERE case_id = ?").run(message, id);
+      if (progressId) fixtureProgress.get(progressId)!.status = 'failed';
       return reply.code(502).send({ error: message, code, runId, mode: body.data.mode, status: 'human_review' });
     } finally {
       if (live) liveBusy = false;
