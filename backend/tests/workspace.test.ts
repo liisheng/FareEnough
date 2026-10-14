@@ -105,6 +105,7 @@ it('labels submitted-case replay honestly and retains all five artifacts without
   const id=(await create()).json().id;await respond(id);
   const result=await run(id,'replay');expect(result.statusCode).toBe(201);expect(result.json().status).toBe('human_review');
   expect(result.json().events).toHaveLength(10);expect(result.json().judgeProposal.explanation).toContain('Replay');
+  expect((await app.inject({url:`/api/workspace/cases/${id}`,headers:headers('support')})).json().technicalFailure).toBe(false);
   expect(calls).toHaveLength(0);expect(db.prepare('SELECT count(*) AS n FROM simulated_actions').get()).toEqual({n:0});
 });
 
@@ -125,6 +126,9 @@ it('records provider failure safely and recovers interrupted cases without resta
   expect((await run(id)).statusCode).toBe(502);
   const c=await app.inject({url:`/api/workspace/cases/${id}`,headers:headers('support')});
   expect(c.json().status).toBe('human_review');expect(c.body).not.toContain('PRIVATE_PROVIDER_SECRET');
+  expect(c.json().technicalFailure).toBe(true);
+  fail=false;expect((await run(id)).statusCode).toBe(201);
+  expect((await app.inject({url:`/api/workspace/cases/${id}`,headers:headers('support')})).json().technicalFailure).toBe(false);
   db.prepare("UPDATE workspace_cases SET status='running' WHERE case_id=?").run(id);
   const count=calls.length;recoverInterruptedCases();expect(calls).toHaveLength(count);
   expect((await app.inject({url:`/api/workspace/cases/${id}`,headers:headers('rider')})).json().reason).toContain('restarted');
@@ -162,17 +166,20 @@ it('connects the actual frontend scripts to intake, driver response, live agent 
   }
   const browser1=browser();await browser1.settle();
   const n=browser1.node;
-  expect(n('#trip').value).toMatch(/^DEMO-/);
+  expect(n('#trip').value).toMatch(/^TRIP-/);
+  const originalReference=n('#trip').value;
   n('#complaint').value='UI_RIDER_PRIVATE: I waited at the lobby.';
   await browser1.submit('#intake-form');expect(n('#rider-outcome').innerHTML).toContain('UI_RIDER_PRIVATE');
-  await browser1.submit('#intake-form');expect(n('#form-message').textContent).toContain('Opened the existing case');
+  expect(n('#trip').value).toMatch(/^TRIP-/);expect(n('#trip').value).not.toBe(originalReference);
+  expect(n('#complaint').value).toBe('');
+  await browser1.submit('#intake-form');expect(n('#form-message').textContent).toContain('Enter an account');
   expect(db.prepare('SELECT count(*) AS n FROM workspace_cases').get()).toEqual({n:1});
   expect(calls).toHaveLength(0);
   await browser1.navigate('driver');expect(n('#driver-view').hidden).toBe(false);expect(n('#driver-detail').innerHTML).not.toContain('UI_RIDER_PRIVATE');
   n('#driver-account').value='UI_DRIVER_PRIVATE: I waited at the pickup.';
   await browser1.submit('#driver-form');expect(n('#driver-detail').innerHTML).toContain('UI_DRIVER_PRIVATE');
   await browser1.navigate('support');expect(n('#workspace').innerHTML).toContain('UI_RIDER_PRIVATE');expect(n('#workspace').innerHTML).toContain('UI_DRIVER_PRIVATE');
-  await n('#case-review-mode').listeners.change({target:{value:'live'}});expect(calls).toHaveLength(0);
+  expect(n('#workspace').innerHTML).not.toContain('case-review-mode');expect(n('#workspace').innerHTML).toContain('Start AI review');expect(calls).toHaveLength(0);
   await n('#case-start-review').listeners.click({target:n('#case-start-review')});
   expect(calls).toHaveLength(5);expect(n('#workspace').innerHTML).toContain('VALIDATED DECISION');
   await browser1.navigate('rider');expect(n('#rider-outcome').innerHTML).toContain('Live AI');expect(n('#rider-outcome').innerHTML).not.toContain('UI_DRIVER_PRIVATE');

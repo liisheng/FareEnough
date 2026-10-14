@@ -8,31 +8,31 @@ import { canRead, createSession, demoActors, findWorkspaceCase, publicCase, requ
 
 const Intake = z.object({ tripReference: z.string().trim().min(1).max(80), category: z.enum(['no-show', 'route']),
   complaint: z.string().trim().min(10).max(2000), safety: z.boolean(), requestKey: z.string().min(1).max(100) }).strict();
-export async function workspaceRoutes(app: FastifyInstance) {
+export async function workspaceRoutes(app: FastifyInstance, options: {enqueueReview?: (id:string)=>void} = {}) {
   app.addHook('onRequest', async (request, reply) => {
     if (request.headers.origin && !['http://127.0.0.1:3000', 'http://localhost:3000'].includes(request.headers.origin)) return reply.code(403).send({ error: 'Origin is not allowed' });
   });
   app.post('/api/workspace/session', async (request, reply) => {
-    if (config.APP_MODE !== 'demo') return reply.code(403).send({ error: 'Demo sessions are disabled' });
+    if (config.APP_MODE !== 'demo') return reply.code(403).send({ error: 'Workspace sessions are disabled' });
     const body = z.object({ role: z.enum(['rider', 'driver', 'support']) }).strict().safeParse(request.body);
-    if (!body.success) return reply.code(400).send({ error: 'Choose a demo role' });
+    if (!body.success) return reply.code(400).send({ error: 'Choose a workspace' });
     return createSession(body.data.role);
   });
   app.get('/api/workspace/trips', async (request, reply) => {
     const session = requireSession(request, reply, 'rider'); if (!session) return;
     if (session.actor_id !== demoActors.rider) return [];
     const trip = loadDisp002Fixture().trip_data;
-    return [{ id: trip.trip_id, label: 'Organizer no-show trip · verified demo records', feeMinor: 500 }];
+    return [{ id: trip.trip_id, label: 'No-show trip · sample records', feeMinor: 500 }];
   });
   app.post('/api/workspace/trips', async (request, reply) => {
     const s = requireSession(request, reply, 'rider'); if (!s) return;
-    if (config.APP_MODE !== 'demo' || s.actor_id !== demoActors.rider) return reply.code(403).send({error:'Demo trip creation is unavailable.'});
+    if (config.APP_MODE !== 'demo' || s.actor_id !== demoActors.rider) return reply.code(403).send({error:'Trip reference creation is unavailable.'});
     const parsed = z.object({requestKey:z.string().uuid()}).strict().safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({error:'A valid demo trip request key is required.'});
+    if (!parsed.success) return reply.code(400).send({error:'A valid trip request key is required.'});
     const db = getDb();
     const existing = db.prepare('SELECT trip_reference FROM demo_trips WHERE rider_id = ? AND request_key = ?').get(s.actor_id,parsed.data.requestKey) as {trip_reference:string} | undefined;
     if (existing) return {id:existing.trip_reference};
-    const id = `DEMO-${randomUUID()}`;
+    const id = `TRIP-${randomUUID()}`;
     db.prepare('INSERT INTO demo_trips VALUES (?, ?, ?, ?, ?)').run(id,s.actor_id,loadDisp002Fixture().trip_data.trip_id,parsed.data.requestKey,new Date().toISOString());
     return reply.code(201).send({id});
   });
@@ -78,7 +78,9 @@ export async function workspaceRoutes(app: FastifyInstance) {
     const parsed = z.object({ account: z.string().trim().min(10).max(2000) }).strict().safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Enter an account of 10–2,000 characters.' });
     if (c.driver_account) return c.driver_account === parsed.data.account ? publicCase(c,s) : reply.code(409).send({ error: 'Submitted accounts cannot be changed.' });
-    getDb().prepare(`UPDATE workspace_cases SET driver_account = ?, driver_filed_at = ?, status = ?, reason = ? WHERE case_id = ?`).run(parsed.data.account,new Date().toISOString(),c.supported?'ready':'human_review',c.supported?'Both accounts received. Support can start review.':c.reason,c.case_id);
+    const automatic=c.supported && Boolean(options.enqueueReview);
+    getDb().prepare(`UPDATE workspace_cases SET driver_account = ?, driver_filed_at = ?, status = ?, reason = ? WHERE case_id = ?`).run(parsed.data.account,new Date().toISOString(),automatic?'queued':c.supported?'ready':'human_review',automatic?'Both accounts received. Live AI review will start automatically.':c.supported?'Both accounts received. Support can start review.':c.reason,c.case_id);
+    if(automatic)options.enqueueReview!(c.case_id);
     return publicCase(findWorkspaceCase(c.case_id)!, s);
   });
 }

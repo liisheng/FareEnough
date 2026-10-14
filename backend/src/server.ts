@@ -1,7 +1,8 @@
 import Fastify from 'fastify';
 import { healthRoutes } from './routes/health.js';
 import { caseRoutes } from './routes/cases.js';
-import { runRoutes } from './routes/runs.js';
+import { runRoutes, type ReviewRunner } from './routes/runs.js';
+import { createAutomaticReviews } from './automatic-reviews.js';
 import { getDb } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { HOST, PORT } from './config.js';
@@ -39,8 +40,11 @@ export async function buildServer(): Promise<ReturnType<typeof Fastify>> {
 
   await app.register(healthRoutes);
   await app.register(caseRoutes);
-  await app.register(runRoutes);
-  await app.register(workspaceRoutes);
+  let runner!: ReviewRunner;
+  await app.register(runRoutes, {onReady(value: ReviewRunner) {runner=value;}});
+  const automatic=createAutomaticReviews(runner);
+  app.addHook('onClose',async()=>{await automatic.close();});
+  await app.register(workspaceRoutes,{enqueueReview:automatic.enqueue});
 
   return app;
 }

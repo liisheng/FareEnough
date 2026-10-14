@@ -7,6 +7,7 @@ import { projectCaseEvidence } from './projections/case-projection.js';
 export type DemoRole = 'rider' | 'driver' | 'support';
 export interface Session { role: DemoRole; actor_id: string }
 export interface WorkspaceCase {
+  automatic_attempts: number;
   case_id: string; rider_id: string; driver_id: string | null; trip_reference: string;
   category: string; complaint: string; safety: number; supported: number;
   driver_account: string | null; driver_filed_at: string | null; filed_at: string;
@@ -23,7 +24,7 @@ export function createSession(role: DemoRole) {
 export function requireSession(request: FastifyRequest, reply: FastifyReply, role?: DemoRole): Session | null {
   const token = request.headers.authorization?.replace(/^Bearer /, '') ?? '';
   const session = getDb().prepare('SELECT role, actor_id FROM demo_sessions WHERE token = ? AND expires_at > ?').get(token, Date.now()) as Session | undefined;
-  if (!session) { reply.code(401).send({ error: 'Select a demo persona again.' }); return null; }
+  if (!session) { reply.code(401).send({ error: 'Select your workspace again.' }); return null; }
   if (role && session.role !== role) { reply.code(403).send({ error: 'This action requires another role.' }); return null; }
   return session;
 }
@@ -41,13 +42,15 @@ export function publicCase(c: WorkspaceCase, session: Session) {
     status: d.validationStatus, disposition: d.dispositionLabel, amountMinor: d.amountMinor,
     feeTreatment: d.feeTreatment, mode: result.mode,
     explanation: d.validationStatus === 'validated'
-      ? `The organizer no-show policy was checked against the recorded waiting duration. ${d.feeTreatment}. Any adjustment is simulated.`
+      ? `The selected no-show policy was checked against the recorded waiting duration. ${d.feeTreatment}. Any adjustment is simulated.`
       : 'A reviewer must assess this case. No automatic financial adjustment was made.',
   } : null;
   const shared = {
     id: c.case_id, tripReference: c.trip_reference, type: c.category, filed: c.filed_at,
     status: c.status, reason: c.reason, supported: Boolean(c.supported), driverAssigned: Boolean(c.driver_id),
-    driverResponded: Boolean(c.driver_account), mode: c.run_mode, outcome,
+    driverResponded: Boolean(c.driver_account), mode: c.run_mode ?? (c.status === 'queued' ? 'live' : null), outcome,
+    automaticAttempts: c.automatic_attempts, automaticAttemptLimit: 3,
+    technicalFailure: c.status === 'review_failed' || (c.status === 'human_review' && Boolean(c.run_id) && !result),
     ownAccount: session.role === 'driver' ? c.driver_account : c.complaint,
   };
   return session.role === 'support' ? { ...shared, complaint: c.complaint, driverAccount: c.driver_account,
@@ -64,5 +67,6 @@ export function workspaceProjection(c: WorkspaceCase) {
   return p;
 }
 export function recoverInterruptedCases() {
+  getDb().prepare("UPDATE workspace_cases SET status = 'review_failed', reason = 'The service restarted before automatic review finished. Support can retry.' WHERE status IN ('queued','retrying')").run();
   getDb().prepare("UPDATE workspace_cases SET status = 'human_review', reason = 'The server restarted during review. Support can explicitly retry; no automatic action was completed.' WHERE status = 'running'").run();
 }

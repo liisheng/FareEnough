@@ -18,9 +18,16 @@ import { SubmittedReplayProvider } from '../providers/submitted-replay-provider.
 
 const RunBodySchema = z.object({ mode: z.enum(['replay', 'live']), progressId: z.string().uuid().optional() }).strict();
 
+export interface ReviewResponse { statusCode: number; body: unknown }
+export interface ReviewRunner {
+  run: (id: string, mode: 'live' | 'replay') => Promise<ReviewResponse>;
+  isBusy: () => boolean;
+}
+
 export interface RunRoutesOptions {
   env?: Env;
   liveProviderFactory?: () => ModelProvider;
+  onReady?: (runner: ReviewRunner) => void;
 }
 
 function boundedInt(value: string, fallback: number, maximum: number): number {
@@ -60,21 +67,17 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
     const progress = fixtureProgress.get((request.params as {progressId:string}).progressId);
     return progress ?? reply.code(404).send({ error: 'Progress unavailable' });
   });
-  app.post('/api/cases/:id/runs', async (request, reply) => {
-    if (request.headers.origin && !['http://127.0.0.1:3000', 'http://localhost:3000'].includes(request.headers.origin)) {
-      return reply.code(403).send({ error: 'Origin is not allowed' });
-    }
-    const { id } = request.params as { id: string };
+  const execute = async (id: string, rawBody: unknown): Promise<ReviewResponse> => {
+    const reply = { code: (statusCode: number) => ({ send: (body: unknown) => ({statusCode, body}) }) };
     const submitted = id === 'DISP-002' ? undefined : findWorkspaceCase(id);
     if (id !== 'DISP-002') {
-      if (!requireSession(request, reply, 'support')) return;
       if (!submitted) return reply.code(404).send({ error: 'Case not found' });
       if (!submitted.supported || !submitted.driver_account) return reply.code(409).send({ error: 'Review requires a supported trip and both party accounts.' });
       if (submitted.status === 'running') return reply.code(409).send({ error: 'This case is already running.' });
       if (submitted.status === 'completed') return reply.code(200).send(JSON.parse(submitted.result!));
     }
 
-    const body = RunBodySchema.safeParse(request.body);
+    const body = RunBodySchema.safeParse(rawBody);
     if (!body.success) {
       return reply.code(400).send({ error: 'Choose explicit replay or live mode' });
     }
@@ -195,5 +198,18 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
     } finally {
       if (live) liveBusy = false;
     }
+  };
+  options.onReady?.({run: (id,mode) => execute(id,{mode}), isBusy: () => liveBusy});
+  app.post('/api/cases/:id/runs', async (request, reply) => {
+    if (request.headers.origin && !['http://127.0.0.1:3000', 'http://localhost:3000'].includes(request.headers.origin)) {
+      return reply.code(403).send({error:'Origin is not allowed'});
+    }
+    const {id} = request.params as {id:string};
+    if(id !== 'DISP-002') {
+      if(!requireSession(request, reply, 'support')) return;
+      if(['queued','retrying'].includes(findWorkspaceCase(id)?.status ?? '')) return reply.code(409).send({error:'This case is queued for automatic review.'});
+    }
+    const result = await execute(id,request.body);
+    return reply.code(result.statusCode).send(result.body);
   });
 }

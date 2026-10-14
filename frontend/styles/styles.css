@@ -36,11 +36,7 @@
   margin-bottom: 0;
 }
 
-.seeded-review {
-  margin-top: 36px;
-  padding-top: 28px;
-  border-top: 1px solid var(--border);
-}
+
 
 .account-text {
   white-space: pre-wrap;
@@ -55,5 +51,25 @@
   margin-top: 8px;
 }
 
-#new-demo-trip { margin-top: 12px; }
+
 #trip[readonly] { background: #f7f8fa; font-size: 12px; }
+
+/* Keep queue statuses aligned independently of reference length. */
+.case-button .case-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: start;
+  gap: 12px;
+}
+
+.case-button .case-top > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.case-button .case-top > .badge {
+  width: 112px;
+  padding: 5px 9px;
+  text-align: center;
+  line-height: 1.5;
+}

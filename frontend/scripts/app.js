@@ -45,7 +45,7 @@
   function stageList(events,runStatus){
     const latest=new Map();
     for(const event of [...(Array.isArray(events)?events:[])].sort((a,b)=>(a.sequence||0)-(b.sequence||0)))latest.set(event.stage,event.status);
-    const stopped=['failed','human_review','interrupted'].includes(runStatus);
+    const stopped=['failed','human_review','interrupted','retrying','review_failed'].includes(runStatus);
     const rows=reviewStages.map(stage=>{
       const status=latest.get(stage.id);
       const state=['complete','completed','succeeded'].includes(status)?'completed':status==='failed'?'failed':stopped?'stopped':['started','running'].includes(status)?'running':'waiting';
@@ -63,7 +63,7 @@
   }
   function supportReady(ev,run,mode='replay'){
     const label=modeName(runMode(run,mode)).toUpperCase();
-    return `<section class="card workspace-head"><div><span class="eyebrow">${label} ${run?'RUN':'READY'} · DISP-002</span><h2>No-show charge review</h2><p>Organizer fixture · Evidence-safe projection</p></div><button id="start-review" class="button">${run?'Run again':'Start'} ${mode==='live'?'live AI review':'three-agent replay'} <span>→</span></button></section><section class="card"><div class="case-top"><h2>Evidence snapshot</h2><span class="replay-label">${label}</span></div>${factStrip(ev)}<p class="small">Deterministic code calculates the waiting duration. Agents interpret the record; they do not calculate or execute money.</p></section><section class="card"><div class="case-top"><h2>Review stages</h2><span class="run-status">${esc(run?reviewState(run).label:'Ready')}</span></div>${stageList(run?.events,run?.status)}</section><section class="card"><h2>Independent advocate briefs</h2><div class="role-grid">${agentCard('Rider Advocate','RIDER',run?.riderBrief)}${agentCard('Driver Advocate','DRIVER',run?.driverBrief)}</div>${rebuttal('Rider Advocate rebuttal',run?.riderRebuttal)}${rebuttal('Driver Advocate rebuttal',run?.driverRebuttal)}</section>${run?.judgeProposal?`<section class="card judge"><span class="eyebrow">JUDGE PROPOSAL</span><h2>${esc(run.judgeProposal.outcome||run.judgeProposal.disposition||run.judgeProposal.action||'Proposed ruling')}</h2><p>${esc(run.judgeProposal.explanation||'')}</p><div class="citation-row">${citations(run.judgeProposal.policyRuleIds)}</div></section>`:''}${decisionCard(run||{})}`;
+    return `<section class="card workspace-head"><div><span class="eyebrow">${label} ${run?'RUN':'READY'} · ${esc(run?.caseId||'Case review')}</span><h2>No-show charge review</h2><p>Case evidence</p></div></section><section class="card"><div class="case-top"><h2>Evidence snapshot</h2><span class="replay-label">${label}</span></div>${factStrip(ev)}<p class="small">Deterministic code calculates the waiting duration. Agents interpret the record; they do not calculate or execute money.</p></section><section class="card"><div class="case-top"><h2>Review stages</h2><span class="run-status">${esc(run?reviewState(run).label:'Ready')}</span></div>${stageList(run?.events,run?.status)}</section><section class="card"><h2>Independent advocate briefs</h2><div class="role-grid">${agentCard('Rider Advocate','RIDER',run?.riderBrief)}${agentCard('Driver Advocate','DRIVER',run?.driverBrief)}</div>${rebuttal('Rider Advocate rebuttal',run?.riderRebuttal)}${rebuttal('Driver Advocate rebuttal',run?.driverRebuttal)}</section>${run?.judgeProposal?`<section class="card judge"><span class="eyebrow">JUDGE PROPOSAL</span><h2>${esc(run.judgeProposal.outcome||run.judgeProposal.disposition||run.judgeProposal.action||'Proposed ruling')}</h2><p>${esc(run.judgeProposal.explanation||'')}</p><div class="citation-row">${citations(run.judgeProposal.policyRuleIds)}</div></section>`:''}${decisionCard(run||{})}`;
   }
   function riderReady(ev,run,mode='replay'){
     const d=run&&(run.validatedDecision||run.judgeProposal),label=modeName(runMode(run,mode)).toUpperCase();
@@ -71,33 +71,6 @@
     const state=reviewState(run);
     return `<div class="rider-grid"><section class="card outcome"><div class="case-top"><span class="eyebrow">CASE DISP-002 · ${label}</span><span class="badge ${state.badge}">${state.label}</span></div><h2>${esc(state.requiresReview?'Human review required':d.dispositionLabel||d.disposition||d.outcome||'Decision proposed')}</h2><p>${esc(d.explanation||'')}</p><div class="amount">${money(state.requiresReview?0:d.amountMinor??d.proposedAdjustmentCents)} simulated adjustment</div><p class="money-note">${esc(state.requiresReview?'Fee validity remains unresolved':d.feeTreatment||'No fare change')} · No real payment action occurred.</p></section><section class="card"><h2>Why this outcome?</h2><ul class="friendly-list">${list(d.decisiveFacts||[`The recorded waiting duration was ${ev.waitSeconds} seconds.`])}</ul><h3>Policy references</h3><div class="citation-row">${citations(d.policyRuleIds||d.policyCitations)}</div><p class="small">If evidence is incomplete or contradictory, FareEnough sends the case to a person instead of automating an outcome.</p></section></div>`;
   }
-  function errorCard(message){return `<section class="card unavailable"><span class="eyebrow">BACKEND UNAVAILABLE</span><h2>The local demo service is not responding.</h2><p>${esc(message)}</p><p>Start the backend on port 3001, then reload. No case action was taken.</p><button class="quiet" onclick="location.reload()">Try again</button></section>`;}
-  function boot(){
-    const $=selector=>document.querySelector(selector);let evidence,run,progressRun,mode='replay',liveAvailable=false,running=false;
-    const renderView=()=>{const active=['#rider','#driver','#support'].includes(location.hash)?location.hash.slice(1):'rider';for(const name of ['rider','driver','support']){$(`#${name}-view`).hidden=name!==active;$(`#${name}-link`).setAttribute('aria-current',name===active?'page':'false');}};
-    const render=()=>{
-      $('#review-mode-label').textContent=mode==='live'?'LIVE AI DEMO':'REPLAY DEMO';$('#support-mode-label').textContent=`INTERNAL SUPPORT · ${modeName(mode).toUpperCase()}`;
-      $('#review-mode-help').textContent=mode==='live'?'Uses ADP when you click Start. Live requests consume your provider allowance. No real payment action.':`Replay uses saved responses and no model calls.${liveAvailable?' Live AI is available.':' Live AI is unavailable.'}`;
-      if(!evidence)return;$('#support-content').innerHTML=supportReady(evidence,run||progressRun,mode);$('#rider-content').innerHTML=riderReady(evidence,run,mode);
-      const state=run?reviewState(run):{badge:'pending',label:'Ready'};$('#queue-badge').className=`badge ${state.badge}`;$('#queue-badge').textContent=state.label;
-      if(running&&!run){$('#start-review').disabled=true;$('#start-review').textContent=`Running ${modeName(mode).toLowerCase()}…`;$('#queue-badge').textContent='Running';}
-    };
-    global.addEventListener('hashchange',renderView);renderView();
-    fetchHealth().then(health=>{liveAvailable=health.liveAvailable===true;$('#live-mode-option').disabled=!liveAvailable;render();}).catch(()=>{liveAvailable=false;render();});
-    fetchEvidence().then(payload=>{evidence=evidenceView(payload);$('#queue-detail').textContent=`${evidence.waitSeconds}-second recorded wait`;render();}).catch(()=>{$('#support-content').innerHTML=errorCard('Case evidence could not be loaded.');$('#rider-content').innerHTML=errorCard('Case evidence could not be loaded.');$('#queue-detail').textContent='Backend unavailable';});
-    $('#review-mode').addEventListener('change',event=>{if(running)return;mode=event.target.value==='live'&&liveAvailable?'live':'replay';event.target.value=mode;run=undefined;progressRun=undefined;render();});
-    document.addEventListener('click',async event=>{
-      const button=event.target.closest('#start-review');if(!button||!evidence||running||(mode==='live'&&!liveAvailable))return;
-      running=true;run=undefined;progressRun={status:'running',mode,events:[]};render();const activeButton=$('#start-review');activeButton.disabled=true;activeButton.textContent=`Running ${modeName(mode).toLowerCase()}…`;$('#review-mode').disabled=true;$('#queue-badge').textContent='Running';
-      const progressId=global.crypto?.randomUUID();let poll,finished=false,polling=false;
-      if(progressId)poll=global.setInterval(async()=>{
-        if(polling||finished)return;polling=true;
-        try{const response=await global.fetch(`${API_BASE}/api/cases/${CASE_ID}/progress/${progressId}`);if(response.ok){const value=await response.json();if(!finished){progressRun=value;render();}}}catch{}finally{polling=false;}
-      },1000);
-      try{run=await startReview(mode,global.fetch,progressId);finished=true;render();}
-      catch{finished=true;running=false;progressRun={...progressRun,status:'failed'};render();$('#support-content').insertAdjacentHTML('afterbegin',`<div class="notice" role="alert"><b>${modeName(mode)} review could not be completed.</b> Please try again. No payment or account action was taken.</div>`);$('#start-review').textContent=`Try ${modeName(mode).toLowerCase()} again`;$('#queue-badge').textContent='Review failed';$('#queue-badge').className='badge review';}
-      finally{finished=true;if(poll!==undefined)global.clearInterval(poll);running=false;$('#review-mode').disabled=false;}
-    });
-  }
-  const api={esc,money,evidenceView,fetchEvidence,fetchHealth,startReview,startReplay,reviewState,factStrip,agentCard,stageList,decisionCard,supportReady,riderReady,errorCard};global.FareEnoughUI=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;if(global.document)boot();
+  function errorCard(message){return `<section class="card unavailable"><span class="eyebrow">BACKEND UNAVAILABLE</span><h2>The review service is not responding.</h2><p>${esc(message)}</p><p>Start the backend on port 3001, then reload. No case action was taken.</p><button class="quiet" onclick="location.reload()">Try again</button></section>`;}
+  const api={esc,money,evidenceView,fetchEvidence,fetchHealth,startReview,startReplay,reviewState,factStrip,agentCard,stageList,decisionCard,supportReady,riderReady,errorCard};global.FareEnoughUI=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
