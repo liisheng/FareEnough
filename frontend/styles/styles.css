@@ -73,3 +73,13 @@
   text-align: center;
   line-height: 1.5;
 }
+/* Keep the admin proposal and final-decision form readable on small screens. */
+#admin-detail pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#admin-detail textarea { width: 100%; box-sizing: border-box; }
+.header nav { flex-wrap: wrap; }
+#evidence-dialog { max-width: 760px; width: 75%; max-height: 80vh; overflow: auto; border: 1px solid #dce1e8; border-radius: 16px; padding: 24px; }
+#evidence-dialog::backdrop { background: #14233880; }
+#evidence-dialog pre, #audit-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#evidence-dialog button:focus-visible, #audit-panel summary:focus-visible, button.citation:focus-visible { outline: 3px solid #a91f50; outline-offset: 3px; }
+#audit-panel details { margin-block: 16px; }
+button.citation { cursor: pointer; background: white; font: inherit; }

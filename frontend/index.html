@@ -3,7 +3,7 @@
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ed3466"><title>FareEnough | Dispute workspace</title><link rel="stylesheet" href="styles/styles.css"><link rel="stylesheet" href="styles/demo.css"><link rel="stylesheet" href="styles/progress.css"><script src="scripts/app.js" defer></script><script src="scripts/participation.js" defer></script></head>
 <body>
 <a class="skip" href="#main">Skip to workspace</a>
-<header class="header"><a class="brand" href="#rider">fare<span>enough</span><b>.</b></a><nav aria-label="Workspace"><a href="#rider" id="rider-link">Rider</a><a href="#driver" id="driver-link">Driver</a><a href="#support" id="support-link">Support</a></nav><span class="local">FARE REVIEW</span></header>
+<header class="header"><a class="brand" href="#rider">fare<span>enough</span><b>.</b></a><nav aria-label="Workspace"><a href="#rider" id="rider-link">Rider</a><a href="#driver" id="driver-link">Driver</a><a href="#support" id="support-link">Review workspace</a><a href="#admin" id="admin-link">Admin decisions</a></nav><span class="local">FARE REVIEW</span></header>
 <div class="demo-bar"><span><strong>Connected dispute workspace</strong></span><span><span id="connection-status" role="status">Connecting to backend…</span></span></div>
 <main id="main" tabindex="-1">
 <section id="rider-view">
@@ -28,11 +28,16 @@
   <div class="rider-grid"><section class="card"><div class="section-heading"><span class="number">01</span><div><h2>Requests for your account</h2><p>Each response joins the existing rider case.</p></div></div><div id="driver-cases" class="case-list"></div></section><section class="card" id="driver-detail" aria-live="polite"></section></div>
 </section>
 <section id="support-view" hidden>
-  <div class="page-heading"><div><span class="eyebrow">INTERNAL SUPPORT</span><h1>Evidence before a verdict.</h1><p>Inspect both perspectives, review uncertainty, and explain the outcome.</p></div><span class="persona">Support reviewer</span></div>
+  <div class="page-heading"><div><span class="eyebrow">REVIEW WORKSPACE</span><h1>Evidence before a verdict.</h1><p>Inspect both perspectives, review uncertainty, and explain the outcome.</p></div><span class="persona">Case review</span></div>
   <div class="support-grid"><aside class="card queue"><h2>Case queue</h2><label for="search">Search case ID</label><input id="search" type="search" placeholder="Search case reference"><label for="status-filter">Status</label><select id="status-filter"><option value="all">All statuses</option><option value="human_review">Human review required</option><option value="awaiting_driver">Awaiting driver</option><option value="ready">Ready for review</option><option value="queued">Queued for AI review</option><option value="retrying">Retry scheduled</option><option value="running">Running</option><option value="review_failed">AI review unavailable</option><option value="completed">Completed</option></select><label for="category-filter">Category</label><select id="category-filter"><option value="all">All categories</option><option value="no-show">No-show charge</option><option value="route">Route / charge</option></select><div id="queue-list" class="case-list"></div></aside><section id="workspace" aria-live="polite"></section></div>
+</section>
+<section id="admin-view" hidden>
+  <div class="page-heading"><div><span class="eyebrow">ADMIN DECISIONS</span><h1>Resolve cases needing human review.</h1><p>Inspect the accounts and original AI proposal, then record a final decision with your rationale.</p></div></div>
+  <div class="support-grid"><aside class="card queue"><h2>Human-review queue</h2><p class="small">Includes technical failures and previously finalized cases.</p><div id="admin-cases" class="case-list"></div></aside><section id="admin-detail" aria-live="polite"></section></div>
 </section>
 <section class="process"><div><span class="eyebrow">HOW THE REVIEW WORKS</span><h2>Three roles. Both sides heard.</h2></div><article><b>01 · Rider Advocate</b><p>Builds the rider’s case from supported evidence.</p></article><article><b>02 · Driver Advocate</b><p>Examines the driver’s records and responds to opposing evidence.</p></article><article><b>03 · Judge</b><p>Weighs both arguments. Uncertainty goes to human review.</p></article></section>
 </main>
 <footer><span class="brand">fare<span>enough</span><b>.</b></span><span>FareEnough · Independent dispute review</span><span>No real payments or messages</span></footer>
 
+<dialog id="evidence-dialog" aria-labelledby="evidence-title"><button type="button" id="close-evidence" autofocus>Close evidence</button><div id="evidence-content"></div></dialog>
 </body></html>

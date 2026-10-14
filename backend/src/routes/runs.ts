@@ -112,6 +112,8 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
     if (live) { liveBusy = true; reservedCalls += 5; }
     let provider: ModelProvider | undefined;
     try {
+    getDb().prepare('INSERT INTO review_checkpoints (run_id,case_id,mode,started_at,evidence) VALUES (?,?,?,?,?)').run(runId,id,body.data.mode,startedAt,JSON.stringify(createCaseEvidenceTools(projection).snapshot()));
+    const partial: Record<string,unknown> = {};
     provider = live ? (options.liveProviderFactory?.() ?? new AdpModelProvider({
       riderAppKey: env.ADP_RIDER_APP_KEY,
       driverAppKey: env.ADP_DRIVER_APP_KEY,
@@ -120,8 +122,12 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       callTimeoutMs: boundedInt(env.MODEL_CALL_TIMEOUT_MS, 60000, 120000),
       runTimeoutMs: boundedInt(env.RUN_TIMEOUT_MS, 240000, 480000),
     })) : submitted ? new SubmittedReplayProvider() : new ReplayModelProvider();
-    const run = await runThreeAgentReview(projection, provider, { runId, onEvent(event) {
+    const run = await runThreeAgentReview(projection, provider, { runId, onArtifact(stage,value) {
+      partial[stage]=value;
+      getDb().prepare('UPDATE review_checkpoints SET artifacts=? WHERE run_id=?').run(JSON.stringify(partial),runId);
+    }, onEvent(event) {
       events.push(event);
+      getDb().prepare('UPDATE review_checkpoints SET events=? WHERE run_id=?').run(JSON.stringify(events),runId);
       if (submitted) getDb().prepare('UPDATE workspace_cases SET events = ? WHERE case_id = ?').run(JSON.stringify(events), id);
     } });
     const decision = validateAgentJudgeProposal(id, run.judgeProposal, {
@@ -172,6 +178,7 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       decision,
     });
     if (submitted) getDb().prepare('UPDATE workspace_cases SET status = ?, reason = ?, result = ? WHERE case_id = ?').run(response.status, decision.status === 'validated' ? 'Review completed; any financial outcome is simulated.' : 'Human review required; no automatic adjustment.', JSON.stringify(response), id);
+    getDb().prepare('UPDATE review_checkpoints SET status=? WHERE run_id=?').run(response.status,runId);
     })();
     if (progressId) fixtureProgress.get(progressId)!.status = response.status;
     return reply.code(201).send(response);
@@ -182,6 +189,7 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       const code = error instanceof AdpProviderError ? error.code : 'INVALID_OR_INCOMPLETE_REVIEW';
       const db = getDb();
       db.transaction(() => {
+        db.prepare("UPDATE review_checkpoints SET status='failed' WHERE run_id=?").run(runId);
         db.prepare(`INSERT INTO agent_runs
           (run_id, case_id, provider, mode, status, input_hash, started_at, completed_at, error_message)
           VALUES (?, ?, ?, ?, 'failed', ?, ?, ?, ?)`).run(

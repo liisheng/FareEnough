@@ -35,3 +35,13 @@ test('technical error messages explain recovery without exposing upstream conten
   assert.match(reviewErrorMessage({status:400}),/provider configuration/);
   assert.doesNotMatch(reviewErrorMessage({status:502,message:'SECRET'}),/SECRET/);
 });
+
+test('admin panel separates final decisions from AI proposals and retains drafts safely',()=>{
+  const {adminPanel}=require('../scripts/participation.js');
+  const c={status:'human_review',supported:true,complaint:'<script>bad</script>',result:{judgeProposal:{outcome:'human_review'}}};
+  const html=adminPanel(c,'',{rationale:'Saved draft',action:'reverse_fee'});
+  assert.match(html,/admin-decision-form/);assert.match(html,/Saved draft/);assert.match(html,/Original AI proposal/);assert.doesNotMatch(html,/<script>/);
+  assert.doesNotMatch(adminPanel({...c,supported:false}),/value="reverse_fee"/);
+  assert.doesNotMatch(adminPanel({...c,status:'running'}),/admin-decision-form/);
+  assert.doesNotMatch(adminPanel({...c,finalDecision:{rationale:'Final reason',decided_at:'2026-10-15'}}),/admin-decision-form/);
+});

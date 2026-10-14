@@ -205,3 +205,7 @@ backend/
     run-persistence.test.ts       Atomicity and idempotency tests
     run-route.test.ts             End-to-end replay API tests
 ```
+
+### Admin decisions
+
+The former Support page is labelled **Review workspace**. **Admin decisions** (`/#admin`) lists cases needing human review or technical recovery and retains finalized cases. Admins inspect accounts and the original AI proposal, enter a required internal rationale, and either close without adjustment or reverse the verified organizer no-show fee (SGD 5.00, simulated only). Unsupported evidence cannot authorize a financial adjustment. Decisions are immutable, idempotent and stored separately from machine results; party views receive a safe final outcome without internal notes. Backend role checks restrict submission to the admin session. Like other local personas, this is not production authentication.

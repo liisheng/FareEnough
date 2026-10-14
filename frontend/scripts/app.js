@@ -4,7 +4,7 @@
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=minor=>`S$${((Number(minor)||0)/100).toFixed(2)}`;
   const list=values=>(Array.isArray(values)?values:[]).map(value=>`<li>${esc(typeof value==='string'?value:value.text||value.claim||JSON.stringify(value))}</li>`).join('');
-  const citations=values=>(Array.isArray(values)?values:[]).map(value=>`<span class="citation">${esc(typeof value==='string'?value:value.id||value.evidenceId||value.ref||'Evidence')}</span>`).join('');
+  const citations=values=>(Array.isArray(values)?values:[]).map(value=>`<button type="button" class="citation" data-citation="${esc(typeof value==='string'?value:value.id||value.evidenceId||value.ref||'Evidence')}">${esc(typeof value==='string'?value:value.id||value.evidenceId||value.ref||'Evidence')}</button>`).join('');
   const claimCitations=value=>[...new Set((value?.claims||[]).flatMap(claim=>[...(claim.evidenceIds||[]),...(claim.policyRuleIds||[])]).concat(value?.citations||[]))];
   const pick=(obj,paths,fallback)=>{for(const path of paths){let value=obj;for(const key of path.split('.'))value=value&&value[key];if(value!==undefined&&value!==null)return value;}return fallback;};
   function evidenceView(payload){

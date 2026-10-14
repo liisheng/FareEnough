@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getDb } from '../db/connection.js';
 import { config } from '../config.js';
+import { reviewHistory, currentEvidence } from '../review-audit.js';
 import { loadDisp002Fixture } from '../fixtures/loader.js';
 import { canRead, createSession, demoActors, findWorkspaceCase, publicCase, requireSession, type WorkspaceCase } from '../workspace.js';
 
@@ -14,7 +15,7 @@ export async function workspaceRoutes(app: FastifyInstance, options: {enqueueRev
   });
   app.post('/api/workspace/session', async (request, reply) => {
     if (config.APP_MODE !== 'demo') return reply.code(403).send({ error: 'Workspace sessions are disabled' });
-    const body = z.object({ role: z.enum(['rider', 'driver', 'support']) }).strict().safeParse(request.body);
+    const body = z.object({ role: z.enum(['rider', 'driver', 'support', 'admin']) }).strict().safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: 'Choose a workspace' });
     return createSession(body.data.role);
   });
@@ -47,6 +48,22 @@ export async function workspaceRoutes(app: FastifyInstance, options: {enqueueRev
     if (!c || !canRead(c, s)) return reply.code(404).send({ error: 'Case not found' });
     return publicCase(c, s);
   });
+  app.get('/api/workspace/cases/:id/audit', async (request,reply)=>{
+    const s=requireSession(request,reply);if(!s)return;
+    if(!['support','admin'].includes(s.role))return reply.code(403).send({error:'Review workspace or admin access required.'});
+    const c=findWorkspaceCase((request.params as {id:string}).id);
+    if(!c)return reply.code(404).send({error:'Case not found'});
+    const projected=publicCase(c,s);
+    return {caseId:c.case_id,evidence:currentEvidence(c),runs:reviewHistory(c.case_id),finalDecision:'finalDecision' in projected?projected.finalDecision:null};
+  });
+  app.get('/api/workspace/cases/:id/export', async (request,reply)=>{
+    const s=requireSession(request,reply);if(!s)return;
+    const c=findWorkspaceCase((request.params as {id:string}).id);
+    if(!c||!canRead(c,s))return reply.code(404).send({error:'Case not found'});
+    const internal=['support','admin'].includes(s.role);
+    return {schemaVersion:1,exportedAt:new Date().toISOString(),audience:s.role,simulationOnly:true,
+      case:publicCase(c,s),...(internal?{evidence:currentEvidence(c),runs:reviewHistory(c.case_id)}:{})};
+  });
   app.post('/api/workspace/cases', async (request, reply) => {
     const s = requireSession(request, reply, 'rider'); if (!s) return;
     const parsed = Intake.safeParse(request.body);
@@ -78,9 +95,32 @@ export async function workspaceRoutes(app: FastifyInstance, options: {enqueueRev
     const parsed = z.object({ account: z.string().trim().min(10).max(2000) }).strict().safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Enter an account of 10–2,000 characters.' });
     if (c.driver_account) return c.driver_account === parsed.data.account ? publicCase(c,s) : reply.code(409).send({ error: 'Submitted accounts cannot be changed.' });
+    if(c.status==='completed') return reply.code(409).send({error:'This case has a final decision.'});
     const automatic=c.supported && Boolean(options.enqueueReview);
     getDb().prepare(`UPDATE workspace_cases SET driver_account = ?, driver_filed_at = ?, status = ?, reason = ? WHERE case_id = ?`).run(parsed.data.account,new Date().toISOString(),automatic?'queued':c.supported?'ready':'human_review',automatic?'Both accounts received. Live AI review will start automatically.':c.supported?'Both accounts received. Support can start review.':c.reason,c.case_id);
     if(automatic)options.enqueueReview!(c.case_id);
     return publicCase(findWorkspaceCase(c.case_id)!, s);
   });
+  app.post('/api/workspace/cases/:id/final-decision', async (request, reply) => {
+    const session=requireSession(request,reply,'admin');if(!session)return;
+    const parsed=z.object({action:z.enum(['reverse_fee','close_no_adjustment']),amountMinor:z.number().int().min(0).max(500),currency:z.literal('SGD'),rationale:z.string().trim().min(10).max(2000)}).strict().safeParse(request.body);
+    if(!parsed.success)return reply.code(400).send({error:'Choose an action, SGD amount and a rationale of 10?2,000 characters.'});
+    const id=(request.params as {id:string}).id, db=getDb(), decision=parsed.data;
+    const response=db.transaction(()=>{
+      const c=findWorkspaceCase(id);
+      if(!c)return {status:404,error:'Case not found'};
+      const existing=db.prepare('SELECT action,amount_minor,currency,rationale FROM human_decisions WHERE case_id=?').get(id) as any;
+      if(existing)return existing.action===decision.action && existing.amount_minor===decision.amountMinor && existing.currency===decision.currency && existing.rationale===decision.rationale ? {status:200} : {status:409,error:'A final decision is already recorded and cannot be overwritten.'};
+      if(!['human_review','review_failed'].includes(c.status))return {status:409,error:'Only cases requiring human review can be finalized.'};
+      if(decision.action==='reverse_fee' && (!c.supported || decision.amountMinor!==500))return {status:400,error:'Fee reversal requires verified organizer no-show evidence and an exact SGD 5.00 adjustment.'};
+      if(decision.action==='close_no_adjustment' && decision.amountMinor!==0)return {status:400,error:'Closing without adjustment requires a zero amount.'};
+      db.prepare('INSERT INTO human_decisions VALUES (?,?,?,?,?,?,?)').run(id,session.actor_id,decision.action,decision.amountMinor,decision.currency,decision.rationale,new Date().toISOString());
+      db.prepare("UPDATE workspace_cases SET status='completed', reason='Final decision recorded by an administrator. No real payment was made.' WHERE case_id=?").run(id);
+      db.prepare("UPDATE cases SET status='completed' WHERE case_id=?").run(id);
+      return {status:201};
+    })();
+    if(response.error)return reply.code(response.status).send({error:response.error});
+    return reply.code(response.status).send(publicCase(findWorkspaceCase(id)!,session));
+  });
+
 }

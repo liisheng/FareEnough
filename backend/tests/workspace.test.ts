@@ -188,3 +188,68 @@ it('connects the actual frontend scripts to intake, driver response, live agent 
   expect(reloaded.node('#trip').value).not.toBe(n('#trip').value);
   expect(calls).toHaveLength(5);
 });
+
+it('requires admin, validates final decisions, preserves AI results and prevents duplicate adjustments',async()=>{
+  tokens.admin=(await app.inject({method:'POST',url:'/api/workspace/session',payload:{role:'admin'}})).json().token;
+  const id=(await create()).json().id;await respond(id);await run(id,'replay');
+  const original=db.prepare('SELECT result FROM workspace_cases WHERE case_id=?').get(id);
+  const decide=(role:string,payload:any)=>app.inject({method:'POST',url:`/api/workspace/cases/${id}/final-decision`,headers:headers(role),payload});
+  const payload={action:'reverse_fee',amountMinor:500,currency:'SGD',rationale:'The evidence does not justify retaining this fee.'};
+  expect((await decide('support',payload)).statusCode).toBe(403);
+  expect((await decide('rider',payload)).statusCode).toBe(403);
+  for(const change of [{amountMinor:501},{amountMinor:-1},{amountMinor:499},{currency:'USD'},{rationale:''},{action:'close_no_adjustment'}])expect((await decide('admin',{...payload,...change})).statusCode).toBe(400);
+  expect((await decide('admin',payload)).statusCode).toBe(201);
+  expect((await decide('admin',payload)).statusCode).toBe(200);
+  expect((await decide('admin',{...payload,rationale:'A changed final rationale.'})).statusCode).toBe(409);
+  expect(db.prepare('SELECT result FROM workspace_cases WHERE case_id=?').get(id)).toEqual(original);
+  expect(db.prepare('SELECT count(*) AS n FROM human_decisions').get()).toEqual({n:1});
+  const rider=(await app.inject({url:`/api/workspace/cases/${id}`,headers:headers('rider')})).json();
+  expect(rider).toMatchObject({status:'completed',outcome:{mode:'human',amountMinor:500}});
+  expect(rider.finalDecision).toBeUndefined();expect(JSON.stringify(rider)).not.toContain(payload.rationale);
+  const before=calls.length;await run(id);expect(calls.length).toBe(before);
+});
+
+it('rejects active-case finalization and unsupported financial adjustments',async()=>{
+  tokens.admin=(await app.inject({method:'POST',url:'/api/workspace/session',payload:{role:'admin'}})).json().token;
+  const id=(await create()).json().id;
+  const payload={action:'close_no_adjustment',amountMinor:0,currency:'SGD',rationale:'No supported financial adjustment can be established.'};
+  const decide=(caseId:string,body:any)=>app.inject({method:'POST',url:`/api/workspace/cases/${caseId}/final-decision`,headers:headers('admin'),payload:body});
+  expect((await decide(id,payload)).statusCode).toBe(409);
+  const other=(await create({category:'route',requestKey:'route-case'})).json().id;
+  expect((await decide(other,{...payload,action:'reverse_fee',amountMinor:500})).statusCode).toBe(400);
+  expect((await decide(other,payload)).statusCode).toBe(201);
+  expect((await respond(other)).statusCode).toBe(409);
+});
+
+it('retains grounded partial artifacts and isolates audit history and exports from parties',async()=>{
+  const id=(await create()).json().id;await respond(id);
+  // Force failure only after the briefs have completed and been persisted.
+  const provider=new ReplayModelProvider();
+  const original=provider.generate.bind(provider);
+  // The existing provider fixture can be replaced through its prototype for this run.
+  const saved=ReplayModelProvider.prototype.generate;
+  ReplayModelProvider.prototype.generate=async function(request){if(request.stage==='rider_rebuttal')throw Error('DO_NOT_EXPORT_PROVIDER_SECRET');return original(request);};
+  try{expect((await run(id)).statusCode).toBe(502);}finally{ReplayModelProvider.prototype.generate=saved;}
+  const audit=(await app.inject({url:`/api/workspace/cases/${id}/audit`,headers:headers('support')})).json();
+  expect(audit.runs).toHaveLength(1);expect(audit.runs[0].status).toBe('failed');
+  expect(Object.keys(audit.runs[0].artifacts).sort()).toEqual(['driver_brief','rider_brief']);
+  expect(audit.runs[0].evidence.evidence.some((r:any)=>r.id==='gps-005')).toBe(true);
+  expect(JSON.stringify(audit)).not.toContain('DO_NOT_EXPORT_PROVIDER_SECRET');
+  expect((await app.inject({url:`/api/workspace/cases/${id}/audit`,headers:headers('rider')})).statusCode).toBe(403);
+  await run(id);
+  const full=(await app.inject({url:`/api/workspace/cases/${id}/export`,headers:headers('support')})).json();
+  expect(full.runs).toHaveLength(2);expect(full.simulationOnly).toBe(true);
+  const party=(await app.inject({url:`/api/workspace/cases/${id}/export`,headers:headers('rider')})).json();
+  expect(party.runs).toBeUndefined();expect(party.evidence).toBeUndefined();
+  expect(JSON.stringify(party)).not.toContain('DRIVER_PRIVATE');
+  expect(party.case.explanationDetails.policyProfile).toBe('organizer-disp002-v1');
+});
+
+it('keeps checkpoint evidence and artifacts after startup recovery',async()=>{
+  const id=(await create()).json().id;
+  db.prepare('INSERT INTO review_checkpoints (run_id,case_id,mode,started_at,evidence,artifacts) VALUES (?,?,?,?,?,?)').run('interrupted-test',id,'live',new Date().toISOString(),'{}','{"rider_brief":{"position":"Saved validated brief"}}');
+  db.prepare("UPDATE workspace_cases SET status='running',run_id='interrupted-test' WHERE case_id=?").run(id);
+  recoverInterruptedCases();
+  const audit=(await app.inject({url:`/api/workspace/cases/${id}/audit`,headers:headers('support')})).json();
+  expect(audit.runs[0]).toMatchObject({status:'interrupted',artifacts:{rider_brief:{position:'Saved validated brief'}}});
+});
