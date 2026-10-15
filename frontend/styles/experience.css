@@ -10,6 +10,12 @@
     linear-gradient(135deg, #fff 0%, #fff9fb 58%, #f7f9fb 100%);
   box-shadow: 0 18px 50px rgba(39,52,67,.06);
 }
+.demo-guide > *:not(.motion-orb) { position: relative; z-index: 1; }
+.motion-orb { position: absolute; z-index: 0; display: block; pointer-events: none; border-radius: 999px; opacity: .72; filter: blur(.2px); }
+.motion-orb-one { width: 170px; height: 170px; right: -52px; top: -62px; border: 1px solid rgba(237,52,102,.2); background: radial-gradient(circle at 35% 35%,rgba(255,255,255,.92),rgba(237,52,102,.16) 58%,rgba(237,52,102,.04)); }
+.motion-orb-two { width: 78px; height: 78px; right: 24%; bottom: -42px; border: 1px solid rgba(39,52,67,.1); background: rgba(255,255,255,.62); box-shadow: inset 0 0 0 12px rgba(237,52,102,.035); }
+.motion-ready .scenario-card { will-change: transform; }
+.motion-ready .route-actual, .motion-ready .route-reference { will-change: stroke-dashoffset, opacity; }
 .demo-guide-copy { display: grid; grid-template-columns: minmax(220px,.8fr) minmax(340px,1.2fr); column-gap: 28px; align-items: end; }
 .demo-guide-copy .eyebrow { grid-column: 1; }
 .demo-guide-copy h2 { grid-column: 1; font-size: 24px; margin-top: 7px; }

@@ -8,8 +8,10 @@ const files = new Map([
   ['/styles/demo.css', ['styles/demo.css', 'text/css; charset=utf-8']],
   ['/styles/progress.css', ['styles/progress.css', 'text/css; charset=utf-8']],
   ['/styles/experience.css', ['styles/experience.css', 'text/css; charset=utf-8']],
+  ['/vendor/motion.js', ['../node_modules/motion/dist/motion.js', 'text/javascript; charset=utf-8']],
   ['/scripts/app.js', ['scripts/app.js', 'text/javascript; charset=utf-8']],
   ['/scripts/participation.js', ['scripts/participation.js', 'text/javascript; charset=utf-8']],
+  ['/scripts/experience.js', ['scripts/experience.js', 'text/javascript; charset=utf-8']],
 ]);
 const server = createServer(async (request, response) => {
   const file = files.get(new URL(request.url, 'http://localhost').pathname);

@@ -27,17 +27,21 @@ test('desktop intake, automatic review, evidence keyboard access, audit export a
   await page.route('http://127.0.0.1:3000/**',async route=>{
     const path=new URL(route.request().url()).pathname;
     const file=path==='/'?'index.html':path.slice(1);
-    try{await route.fulfill({body:await readFile(new URL('../../'+file,import.meta.url)),contentType:file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html'});}catch{await route.fulfill({status:404});}
+    const source=file==='vendor/motion.js'?new URL('../../../node_modules/motion/dist/motion.js',import.meta.url):new URL('../../'+file,import.meta.url);
+    try{await route.fulfill({body:await readFile(source),contentType:file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html'});}catch{await route.fulfill({status:404});}
   });
   try {
     await page.goto('http://127.0.0.1:3000/');
     await expect(page.locator('#trip')).toHaveValue(/^TRIP-/);
     await page.getByRole('button',{name:/No-show evidence/}).click();
+    await expect(page.locator('html')).toHaveClass(/motion-ready/);
     await expect(page.locator('#category')).toHaveValue('no-show');
     await expect(page.locator('#demo-message')).toContainText('No-show scenario prepared');
     await page.locator('#complaint').fill('I waited at the lobby and could not find the car.');
     await page.getByRole('button',{name:'Submit request'}).click();
     await expect(page.locator('#rider-cases button')).toHaveCount(1);
+    await expect(page.locator('#rider-cases .case-button strong')).toContainText('…');
+    await expect(page.locator('#rider-cases .case-button strong')).toHaveAttribute('title',/^TRIP-/);
     await page.locator('#driver-link').click();
     await page.locator('#driver-account').fill('I waited at the pickup location and contacted the rider.');
     await page.getByRole('button',{name:'Submit my account',exact:true}).click();
@@ -88,7 +92,8 @@ test('mobile route and ERP journey shows the validated 325-cent result without h
   });
   await page.route('http://127.0.0.1:3000/**',async route=>{
     const path=new URL(route.request().url()).pathname,file=path==='/'?'index.html':path.slice(1);
-    try{await route.fulfill({body:await readFile(new URL('../../'+file,import.meta.url)),contentType:file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html'});}catch{await route.fulfill({status:404});}
+    const source=file==='vendor/motion.js'?new URL('../../../node_modules/motion/dist/motion.js',import.meta.url):new URL('../../'+file,import.meta.url);
+    try{await route.fulfill({body:await readFile(source),contentType:file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html'});}catch{await route.fulfill({status:404});}
   });
   try{
     await page.goto('http://127.0.0.1:3000/');
@@ -102,6 +107,8 @@ test('mobile route and ERP journey shows the validated 325-cent result without h
     await page.getByRole('button',{name:'Submit my account',exact:true}).click();
     await queue.idle();
     await page.locator('#support-link').click();
+    await expect(page.locator('#queue-list .case-button strong')).toContainText('…');
+    await expect(page.locator('#queue-list .case-button').first()).toHaveAttribute('aria-label',/TRIP-.*CASE-/);
     await expect(page.getByRole('heading',{name:'Route and additional charge review'})).toBeVisible();
     await expect(page.getByRole('img',{name:/Reference and actual route comparison/})).toBeVisible();
     await expect(page.locator('#workspace')).toContainText('S$3.25');

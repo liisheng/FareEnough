@@ -64,7 +64,9 @@
 
 .case-button .case-top > strong {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .case-button .case-top > .badge {
@@ -72,6 +74,27 @@
   padding: 5px 9px;
   text-align: center;
   line-height: 1.5;
+}
+
+/* The review queues are intentionally narrow, so place status below the compact reference. */
+.queue .case-button .case-top {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.queue .case-button .case-top > .badge {
+  justify-self: start;
+  width: auto;
+  max-width: 100%;
+}
+
+.queue .case-button small {
+  line-height: 1.55;
+}
+
+@media(max-width:700px) {
+  .queue .case-list { grid-template-columns: minmax(0, 1fr); }
+  .queue .case-button { min-width: 0; }
 }
 /* Keep the admin proposal and final-decision form readable on small screens. */
 #admin-detail pre { white-space: pre-wrap; overflow-wrap: anywhere; }

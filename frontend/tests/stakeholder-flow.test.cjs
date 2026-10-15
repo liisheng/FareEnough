@@ -7,8 +7,12 @@ test('shared render helpers do not start the removed fixture walkthrough',()=>{
   const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   assert.doesNotMatch(html,/seeded-rider-view|seeded-support-view|id="review-mode"/);
   assert.match(html,/styles\/experience\.css/);
+  assert.match(html,/vendor\/motion\.js/);
+  assert.match(html,/scripts\/experience\.js/);
   assert.match(html,/data-scenario="no-show"/);
-  assert.match(fs.readFileSync(path.join(__dirname,'../serve.mjs'),'utf8'),/experience\.css/);
+  const server=fs.readFileSync(path.join(__dirname,'../serve.mjs'),'utf8');
+  assert.match(server,/experience\.css/);
+  assert.match(server,/node_modules\/motion\/dist\/motion\.js/);
   const window={document:{},fetch(){throw new Error('Unexpected fixture request');}};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../scripts/app.js'),'utf8'),{window});
   assert.equal(typeof window.FareEnoughUI.stageList,'function');

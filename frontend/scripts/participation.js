@@ -14,6 +14,10 @@
   const activeRole = () => ['rider','driver','support','admin'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'rider';
   const labels = {awaiting_driver:'Awaiting driver',ready:'Ready for review',queued:'Queued for AI review',retrying:'Retry scheduled',review_failed:'AI review unavailable',running:'Review in progress',completed:'Review complete',human_review:'Human review required'};
   function badge(c) { return `<span class="badge ${c.status === 'completed' ? 'resolved' : c.status === 'human_review' ? 'review' : 'pending'}">${esc(labels[c.status] || c.status)}</span>`; }
+  function compactReference(value) {
+    const text=String(value ?? '');
+    return text.length>18?`${text.slice(0,9)}…${text.slice(-4)}`:text;
+  }
   async function api(path, options = {}, persona = role, retry = true) {
     if (!tokens[persona]) {
       const response = await global.fetch(`${BASE}/api/workspace/session`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:persona})});
@@ -40,7 +44,7 @@
     finally {creatingTrip=false;}
   }
   function list(items) {
-    return items.map(c=>`<button class="case-button" data-case-id="${esc(c.id)}" aria-pressed="${selected[role] === c.id}"><span class="case-top"><strong>${esc(c.tripReference)}</strong>${badge(c)}</span><small>${esc(c.type)} · ${esc(c.id)}</small></button>`).join('') || '<p class="empty">No cases found.</p>';
+    return items.map(c=>`<button class="case-button" data-case-id="${esc(c.id)}" aria-pressed="${selected[role] === c.id}" aria-label="${esc(`${c.tripReference}, ${labels[c.status] || c.status}, ${c.type}, ${c.id}`)}"><span class="case-top"><strong title="${esc(c.tripReference)}">${esc(compactReference(c.tripReference))}</strong>${badge(c)}</span><small>${esc(c.type)} · <span title="${esc(c.id)}">${esc(compactReference(c.id))}</span></small></button>`).join('') || '<p class="empty">No cases found.</p>';
   }
   function outcome(c) {
     if (!c.outcome) return `<p>${esc(c.reason)}</p>`;
