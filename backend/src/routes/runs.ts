@@ -15,6 +15,7 @@ import { config, isAdpConfigured, type Env } from '../config.js';
 import { findWorkspaceCase, requireSession, workspaceProjection } from '../workspace.js';
 import { createCaseEvidenceTools } from '../tools/case-evidence-tools.js';
 import { SubmittedReplayProvider } from '../providers/submitted-replay-provider.js';
+import { applyRateLimitHeaders, callerKey, FixedWindowRateLimiter, rateLimitValues } from '../rate-limit.js';
 
 const RunBodySchema = z.object({ mode: z.enum(['replay', 'live']), progressId: z.string().uuid().optional() }).strict();
 
@@ -48,7 +49,7 @@ function displayDecision(
       ? result.disposition === 'claim_rejected' ? 'Rider claim not upheld' : 'Rider claim upheld'
       : 'Human review required',
     feeTreatment: validated
-      ? result.action === 'uphold_fee' ? 'Existing fee upheld' : 'Existing fee reversed'
+      ? result.contractAction === 'no_change' ? 'Existing fee upheld' : result.feeTreatment === 'not_applicable' ? 'Unsupported charge refunded' : 'Existing fee reversed'
       : 'No automatic change',
     decisiveFacts,
     policyRuleIds: result.policyCitations,
@@ -58,6 +59,8 @@ function displayDecision(
 
 export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions = {}): Promise<void> {
   const env = options.env ?? config;
+  const limitConfig = rateLimitValues(env);
+  const runLimiter = new FixedWindowRateLimiter(limitConfig.maxRunStarts, limitConfig.runWindowMs);
   let liveBusy = false;
   let reservedCalls = 0;
   // Original fixture walkthroughs have no workspace case to poll. Expose only
@@ -92,9 +95,9 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
     }
 
     const projection = submitted ? workspaceProjection(submitted) : projectCaseEvidence(loadDisp002Fixture());
-    const waitFact = projection.derivedFacts.find((fact) => fact.id === 'derived_wait_duration');
-    if (!waitFact || typeof waitFact.value !== 'number') {
-      return reply.code(500).send({ error: 'Waiting-duration fact is unavailable' });
+    const decisionFact = projection.derivedFacts.find((fact) => fact.id === (projection.policyProfile.profileId === 'demo-route-erp-v1' ? 'derived_supported_adjustment' : 'derived_wait_duration'));
+    if (!decisionFact || typeof decisionFact.value !== 'number') {
+      return reply.code(500).send({ error: 'Required deterministic decision fact is unavailable' });
     }
 
     const runId = `run-${randomUUID()}`;
@@ -131,11 +134,11 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       if (submitted) getDb().prepare('UPDATE workspace_cases SET events = ? WHERE case_id = ?').run(JSON.stringify(events), id);
     } });
     const decision = validateAgentJudgeProposal(id, run.judgeProposal, {
-      value: waitFact.value,
-      status: waitFact.status,
-      sourceEvidenceIds: waitFact.sourceEvidenceIds,
-      policyRuleIds: waitFact.policyRuleIds,
-    }, submitted ? { profileId: projection.policyProfile.profileId, evidenceIds: new Set(createCaseEvidenceTools(projection).getEvidence().map(e => e.id)) } : undefined);
+      value: decisionFact.value,
+      status: decisionFact.status,
+      sourceEvidenceIds: decisionFact.sourceEvidenceIds,
+      policyRuleIds: decisionFact.policyRuleIds,
+    }, submitted ? { profileId: projection.policyProfile.profileId, evidenceIds: new Set(createCaseEvidenceTools(projection).getEvidence().map(e => e.id)), policyRuleIds: new Set(createCaseEvidenceTools(projection).getPolicyRules().map(r => r.id)) } : undefined);
     const completedAt = new Date().toISOString();
     const artifacts = [
       ['rider_brief', 'rider_advocate', run.riderBrief],
@@ -212,6 +215,9 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
     if (request.headers.origin && !['http://127.0.0.1:3000', 'http://localhost:3000'].includes(request.headers.origin)) {
       return reply.code(403).send({error:'Origin is not allowed'});
     }
+    const rate = runLimiter.consume(callerKey(request));
+    applyRateLimitHeaders(reply, rate);
+    if (!rate.allowed) return reply.code(429).send({error:'Too many review starts. Retry after the indicated delay.'});
     const {id} = request.params as {id:string};
     if(id !== 'DISP-002') {
       if(!requireSession(request, reply, 'support')) return;

@@ -12,7 +12,7 @@
     <section class="card intake"><div class="section-heading"><span class="number">01</span><div><h2>Request a fare review</h2><p>Your trip reference is generated automatically.</p></div></div>
       <form id="intake-form">
         <label for="trip">Trip reference</label><input id="trip" maxlength="80" required readonly placeholder="Generating your trip reference…" autocomplete="off" aria-describedby="trip-message"><p id="trip-message" class="small" role="status">Creating your trip reference.</p>
-        <p class="small">Generated references currently use sample trip evidence. Route disputes require human review.</p>
+        <p class="small">Generated references support the organizer no-show sample and a clearly labelled synthetic route/ERP scenario.</p>
         <label for="category">What would you like reviewed?</label><select id="category" required><option value="no-show">No-show charge</option><option value="route">Route or additional charge</option></select>
         <label for="complaint">Your perspective</label><textarea id="complaint" rows="5" minlength="10" maxlength="2000" required placeholder="Describe what happened and what you would like checked. "></textarea><div class="input-help"><span>10–2,000 characters</span><span id="count">0 / 2000</span></div>
         <label class="check"><input type="checkbox" id="safety"> This includes a safety incident or another concern that needs a person.</label>

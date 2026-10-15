@@ -1,0 +1,11 @@
+{
+  "profile_id": "demo-route-erp-v1",
+  "version": "1.0.0",
+  "synthetic": true,
+  "rules": [
+    { "id": "DEMO-RT-01", "namespace": "demo_interpretation", "text": "A route difference is a review signal, not a distance-proportional refund.", "value": "no_distance_formula", "source_ids": ["SRS-POL-09"] },
+    { "id": "DEMO-RT-02", "namespace": "demo_interpretation", "text": "Verified rider agreement settles the detour allegation for this synthetic scenario.", "value": true, "source_ids": ["SRS-POL-11"] },
+    { "id": "DEMO-ERP-01", "namespace": "demo_interpretation", "text": "Adjustment equals the paid disputed line minus its supported allowed amount, capped at paid and remaining relief.", "value": "max(0, paid_disputed-supported_allowed)", "source_ids": ["SRS-POL-10"] },
+    { "id": "PUB-ERP-01", "namespace": "official_rule", "text": "RydeX ERP is additional and should correspond to actual gantries passed; allocation for an unnecessary detour may remain unresolved.", "value": "actual_gantry_required", "source_ids": ["SRC-RT-04", "SRC-RT-05"] }
+  ]
+}

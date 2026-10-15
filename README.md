@@ -2,7 +2,7 @@
 
 FareEnough is a local hackathon prototype for fair, explainable ride dispute resolution. A Rider Advocate and Driver Advocate independently assess the same evidence, complete one rebuttal round, and present their cases to a Judge. Deterministic code then validates the proposed outcome before anything can be recorded as an action.
 
-This baseline implements the seeded DISP-002 no-show dispute with an auditable replay and an optional Tencent ADP live adapter. Financial outcomes remain simulations. Live operation requires the three published ADP applications; supported cases start automatically after both accounts arrive; local automated tests use synthetic responses.
+This prototype implements the seeded DISP-002 no-show dispute and a clearly labelled synthetic RydeX route/ERP dispute, with auditable replay and an optional Tencent ADP live adapter. Financial outcomes remain simulations. Live operation requires the three published ADP applications; supported cases start automatically after both accounts arrive; local automated tests use deterministic synthetic responses.
 
 ## Run the local demo
 
@@ -34,9 +34,9 @@ Cases, accounts, progress and results are saved in SQLite and restored after ref
 3. Submitting the second account automatically queues Live AI review (requires configured ADP). Open Support to watch progress; that page does not need to be open for the agents to run.
 4. Support shows progress and all five artifacts: two briefs, two rebuttals and the Judge proposal. Return to Rider or Driver to see the saved, role-scoped outcome. Refresh retains the case and result.
 
-Live review sends both new statements plus the matching organizer evidence to all three agents. Submitted-case replay is an offline pipeline exercise: it acknowledges the statements and requests human review rather than applying the original fixture's prerecorded ruling to new accounts. The standalone DISP-002 walkthrough has been removed from the interface; the underlying fixture and policy remain the source for generated demo trips.
+Live review sends both new statements plus the category-matched evidence to all three agents. For submitted no-show cases, replay acknowledges the statements and requests human review instead of treating a prerecorded outcome as a fresh assessment. The synthetic route/ERP replay is deterministic: verified consent settles the route allegation, while complete payment and gantry records support an exact 325-cent simulated refund for the unsupported ERP line.
 
-Unknown trips, route disputes and safety-flagged cases are saved for human review without model execution. Automatic review requires the known no-show trip and both accounts. Full route policy coverage and a manual reviewer disposition workflow remain unimplemented. Missing responses do not imply fault. Completed cases cannot be adjudicated again; technical failures and interrupted cases can be retried explicitly. Completed live decisions requesting human judgment require a reviewer. A server restart marks queued and in-flight cases for review without automatically resuming model calls.
+Unknown trips and safety-flagged cases are saved for human review without model execution. Automatic review supports the known no-show and synthetic route/ERP profiles after both accounts arrive. Missing responses do not imply fault. Completed cases cannot be adjudicated again; technical failures and interrupted cases can be retried explicitly. Completed live decisions requesting human judgment require a reviewer. A server restart marks queued and in-flight cases for review without automatically resuming model calls.
 
 The Support interface offers live review only. Replay remains an internal testing API and is not offered in the review controls. Technical failures show an explicit retry action; completed live results requiring human judgment do not. Connection interruptions require checking the saved run state before another attempt. The support view enables Live AI only when the backend reports configured ADP access. No model call starts on page load or rider intake. The first saved driver response completes the pair and triggers automatic live review for supported cases. Duplicate responses never trigger another attempt. Cases queue behind active reviews, sharing the existing provider concurrency and call-budget limits. Technical failures retry after 2 and 5 seconds, up to three total attempts. At the limit, Support can click Retry AI review for one additional attempt. Configuration and usage-limit failures stop immediately and remain saved for explicit Support retry; they never fall back to replay. The result displays the actual run mode, and cases needing human review are labeled accordingly.
 
@@ -50,9 +50,11 @@ The v2 SSE endpoint is restricted to `https://wss.lke.tencentcloud.com/adp/v2/ch
 
 Limits are five calls per run, one concurrent live run, and at most 60 reserved calls per server process (configurable downward with `MAX_MODEL_CALLS_PER_SESSION`). Failed runs retain their five-call reservation. Restarting the process resets this counter. Per-call and run deadlines use `MODEL_CALL_TIMEOUT_MS` and `RUN_TIMEOUT_MS`, capped at 120 and 480 seconds. Input is bounded to 256 KiB per call and 1 MiB per run; SSE responses to 2 MiB per call; final answers to 120 KiB. Automatic workspace review allows three total attempts (up to 15 reserved calls), subject to the same session budget. The provider adapter itself does not retry. Successful human-review decisions are never retried automatically. These limits are not a billing ceiling; cancelling HTTP does not guarantee Tencent stops an already-started generation. Token and currency budget settings are not advertised because this adapter does not enforce them.
 
+The local server also rate-limits callers in memory. By default, non-health API traffic is limited to 180 requests per minute and explicit AI-run starts to 6 per 10 minutes per caller. Configure these with `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`, `RUN_RATE_LIMIT_WINDOW_MS`, and `RUN_RATE_LIMIT_MAX_STARTS`. A rejected request returns HTTP 429 and `Retry-After`; limits reset when the single local server process restarts. This is suitable for the local hackathon demo, not a distributed production deployment.
+
 For an explicitly authorized live smoke test, build first, then run `node scripts/live-adp-smoke.mjs --run` from `backend/`. It temporarily enables ADP for that process, sends the organizer sample for up to five calls, stores the usual local audit trail, and prints only status metadata. Without `--run` it makes no call. Live API verification is separate from passing offline tests.
 
-The deterministic financial evaluator supports only the seeded DISP-002 organizer profile. A live model connection does not expand that policy coverage to arbitrary cases or route disputes. Reported material uncertainty always blocks automatic validation.
+The deterministic financial evaluator supports the seeded DISP-002 organizer profile and the synthetic `demo-route-erp-v1` profile. It validates zero/500-cent no-show treatment and the route scenario's exact 325-cent unsupported-line adjustment; route distance is never used as a refund formula. The separate `ryde-public-2026-10-07-v1` bundle records bounded public rules and limitations but is not silently substituted for either demo profile. Reported material uncertainty always blocks automatic validation.
 
 Frontend files are organized as follows:
 
@@ -150,11 +152,15 @@ The waiting duration is calculated deterministically in code from the `driver_wa
 data/
   fixtures/
     disp-002.json              Evidence only (no expected ruling or editorial summary)
+    route-erp-001.json         Fully synthetic route, fare, consent and gantry evidence
   policies/
     organizer-disp002-v1.json  Policy bundle with rules, namespaces, and source IDs
+    demo-route-erp-v1.json     Explicit demo interpretations for the synthetic route case
+    ryde-public-2026-10-07-v1.json  Separate bounded public-rule profile
 eval/
   expectations/
     disp-002.json              Answer key (never imported by runtime code)
+  LIVE_VALIDATION_2026-10-15.md  Sanitized measured ADP run summary
 .runtime/                       SQLite database (gitignored)
 ```
 

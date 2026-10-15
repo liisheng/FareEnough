@@ -61,6 +61,31 @@ describe('POST case run', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('rate-limits repeated review-start attempts by caller', async () => {
+    await app.close();
+    app = Fastify({ logger: false });
+    await app.register(runRoutes, {
+      env: parseConfig({ RUN_RATE_LIMIT_MAX_STARTS: '1' }),
+    });
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/cases/DISP-002/runs',
+      payload: { mode: 'invalid' },
+    });
+    expect(first.statusCode).toBe(400);
+    expect(first.headers['ratelimit-limit']).toBe('1');
+    expect(first.headers['ratelimit-remaining']).toBe('0');
+
+    const limited = await app.inject({
+      method: 'POST',
+      url: '/api/cases/DISP-002/runs',
+      payload: { mode: 'replay' },
+    });
+    expect(limited.statusCode).toBe(429);
+    expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+  });
+
   it('exposes neutral fixture progress for one run without starting another review', async () => {
     const progressId = '11111111-1111-4111-8111-111111111111';
     const url = `/api/cases/DISP-002/progress/${progressId}`;

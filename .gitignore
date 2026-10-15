@@ -8,6 +8,9 @@ node_modules/
 .env
 .env.*
 !.env.example
+# A local credential file was briefly created under this name. Keep future
+# copies out of version control; the backend reads backend/.env instead.
+backend/env.txt
 
 # Build output
 dist/

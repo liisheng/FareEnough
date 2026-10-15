@@ -21,6 +21,20 @@ test('normalizes the seeded evidence projection and renders deterministic facts'
   assert.match(ui.factStrip(ev),/8 points/);
 });
 
+test('renders route differences, unsupported ERP and deterministic confidence',()=>{
+  const payload={dispute:{disputeType:'route'},gpsTelemetry:Array.from({length:4}),chatLogs:[],projectedPolicyRules:Array.from({length:4}),derivedFacts:[
+    {id:'derived_route_distance_difference',value:2300},{id:'derived_route_duration_difference',value:600},{id:'derived_supported_adjustment',value:325},
+  ]};
+  const ev=ui.evidenceView(payload),routeRun={...run,validatedDecision:{...run.validatedDecision,amountMinor:325,feeTreatment:'Unsupported charge refunded',confidence:{score:1,completeness:1,corroboration:1,policyCoverage:1,citationValidity:1}}};
+  assert.match(ui.factStrip(ev),/2300 metres/);
+  assert.match(ui.factStrip(ev),/600 seconds/);
+  assert.match(ui.factStrip(ev),/S\$3\.25/);
+  const html=ui.supportReady(ev,routeRun);
+  assert.match(html,/Route and additional charge review/);
+  assert.match(html,/Deterministic confidence: 100%/);
+  assert.match(html,/not a truthfulness probability/);
+});
+
 test('stage progress updates five items from queued through active to complete',()=>{
   const stages=['rider_brief','driver_brief','rider_rebuttal','driver_rebuttal','judge'];
   const idle=ui.stageList([]);

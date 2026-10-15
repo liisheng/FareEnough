@@ -10,6 +10,7 @@ export class ReplayModelProvider implements ModelProvider {
   readonly mode = 'replay' as const;
 
   async generate(request: ModelProviderRequest): Promise<unknown> {
+    if (request.evidence.policyProfile.profileId === 'demo-route-erp-v1') return this.routeOutput(request);
     switch (request.stage) {
       case 'rider_brief': return {
         role: 'rider_advocate',
@@ -62,6 +63,18 @@ export class ReplayModelProvider implements ModelProvider {
         // This field is reserved for unresolved material questions, per Judge contract.
         uncertainty: [],
       };
+    }
+  }
+
+  private routeOutput(request: ModelProviderRequest): unknown {
+    const adjustmentClaim = { text: 'The paid 325-cent ERP line is unsupported by the complete synthetic gantry record.', evidenceIds: ['fare-erp-001','payment-001','gantry-coverage-001','derived_supported_adjustment'], policyRuleIds: ['PUB-ERP-01','DEMO-ERP-01'] };
+    const routeClaim = { text: 'The actual route was longer, but the recorded rider agreement settles the detour question without a distance-based refund.', evidenceIds: ['route-reference-001','route-actual-001','route-consent-001','derived_route_distance_difference'], policyRuleIds: ['DEMO-RT-01','DEMO-RT-02'] };
+    switch (request.stage) {
+      case 'rider_brief': return { role:'rider_advocate', position:'The rider seeks return of the unsupported ERP line, not a distance-proportional refund.', claims:[adjustmentClaim], adverseEvidence:[routeClaim], concessions:['The rider-approved detour is not itself grounds for a refund.'], unansweredQuestions:[] };
+      case 'driver_brief': return { role:'driver_advocate', position:'The detour was agreed, while the separate ERP line must still be supported by a recorded gantry.', claims:[routeClaim], adverseEvidence:[adjustmentClaim], concessions:['The complete synthetic gantry record does not support the ERP line.'], unansweredQuestions:[] };
+      case 'rider_rebuttal': return { role:'rider_advocate', response:'Agreement to the route does not establish that an ERP gantry was passed.', challengedClaim:'Route consent supports every additional fare line.', claims:[adjustmentClaim], preservedConcessions:['No distance-based refund is requested.'] };
+      case 'driver_rebuttal': return { role:'driver_advocate', response:'The route issue is settled, but the unsupported ERP line should be handled independently.', challengedClaim:'A longer route alone determines the refund.', claims:[routeClaim,adjustmentClaim], preservedConcessions:['The ERP line lacks gantry support.'] };
+      case 'judge': return { outcome:'refund_unsupported_charge', explanation:'The rider-approved detour resolves the route allegation. Separately, the complete synthetic gantry and payment evidence establishes that the paid 325-cent ERP line has no supported allowed amount. Deterministic validation must cap any simulated refund at that line and remaining relief.', findings:[routeClaim,adjustmentClaim], evidenceIds:['route-reference-001','route-actual-001','route-consent-001','fare-erp-001','payment-001','gantry-coverage-001','derived_supported_adjustment','derived_supported_total'], policyRuleIds:['DEMO-RT-01','DEMO-RT-02','DEMO-ERP-01','PUB-ERP-01'], proposedAdjustmentCents:325, uncertainty:[] };
     }
   }
 }

@@ -77,12 +77,12 @@ export async function workspaceRoutes(app: FastifyInstance, options: {enqueueRev
     const sourceTrip = loadDisp002Fixture().trip_data.trip_id;
     const demoTrip = db.prepare('SELECT source_trip_id FROM demo_trips WHERE trip_reference = ? AND rider_id = ?').get(data.tripReference,s.actor_id) as {source_trip_id:string} | undefined;
     const knownTrip = s.actor_id === demoActors.rider && (data.tripReference === sourceTrip || demoTrip?.source_trip_id === sourceTrip);
-    const supported = knownTrip && data.category === 'no-show' && !data.safety;
+    const supported = knownTrip && ['no-show','route'].includes(data.category) && !data.safety;
     const id = `CASE-${randomUUID()}`, now = new Date().toISOString();
     const status = supported ? 'awaiting_driver' : 'human_review';
     const reason = data.safety ? 'Safety concern requires human review.' : supported ? 'Awaiting the assigned driver account.' : 'Verified evidence or a supported policy is unavailable; human review is required.';
     db.transaction(() => {
-      db.prepare('INSERT INTO cases (case_id, trip_id, filed_by, dispute_type, description, filed_at, status, policy_profile_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, data.tripReference, 'rider', data.category, data.complaint, now, status, supported ? 'organizer-disp002-v1' : null);
+      db.prepare('INSERT INTO cases (case_id, trip_id, filed_by, dispute_type, description, filed_at, status, policy_profile_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, data.tripReference, 'rider', data.category, data.complaint, now, status, supported ? data.category === 'route' ? 'demo-route-erp-v1' : 'organizer-disp002-v1' : null);
       db.prepare(`INSERT INTO workspace_cases (case_id,rider_id,driver_id,trip_reference,category,complaint,safety,supported,filed_at,status,reason,request_key,request_hash)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id,s.actor_id,knownTrip?demoActors.driver:null,data.tripReference,data.category,data.complaint,Number(data.safety),Number(supported),now,status,reason,requestKey,hash);
     })();
@@ -112,7 +112,8 @@ export async function workspaceRoutes(app: FastifyInstance, options: {enqueueRev
       const existing=db.prepare('SELECT action,amount_minor,currency,rationale FROM human_decisions WHERE case_id=?').get(id) as any;
       if(existing)return existing.action===decision.action && existing.amount_minor===decision.amountMinor && existing.currency===decision.currency && existing.rationale===decision.rationale ? {status:200} : {status:409,error:'A final decision is already recorded and cannot be overwritten.'};
       if(!['human_review','review_failed'].includes(c.status))return {status:409,error:'Only cases requiring human review can be finalized.'};
-      if(decision.action==='reverse_fee' && (!c.supported || decision.amountMinor!==500))return {status:400,error:'Fee reversal requires verified organizer no-show evidence and an exact SGD 5.00 adjustment.'};
+      const supportedAdjustment=c.category==='route'?325:500;
+      if(decision.action==='reverse_fee' && (!c.supported || decision.amountMinor!==supportedAdjustment))return {status:400,error:`Financial adjustment requires verified ${c.category==='route'?'route/ERP':'organizer no-show'} evidence and an exact SGD ${(supportedAdjustment/100).toFixed(2)} amount.`};
       if(decision.action==='close_no_adjustment' && decision.amountMinor!==0)return {status:400,error:'Closing without adjustment requires a zero amount.'};
       db.prepare('INSERT INTO human_decisions VALUES (?,?,?,?,?,?,?)').run(id,session.actor_id,decision.action,decision.amountMinor,decision.currency,decision.rationale,new Date().toISOString());
       db.prepare("UPDATE workspace_cases SET status='completed', reason='Final decision recorded by an administrator. No real payment was made.' WHERE case_id=?").run(id);

@@ -22,6 +22,10 @@ const EnvSchema = z.object({
   RUN_TIMEOUT_MS: z.string().default('240000'),
   MAX_MODEL_CALLS_PER_RUN: z.string().default('12'),
   MAX_MODEL_CALLS_PER_SESSION: z.string().default('60'),
+  RATE_LIMIT_WINDOW_MS: z.string().default('60000'),
+  RATE_LIMIT_MAX_REQUESTS: z.string().default('180'),
+  RUN_RATE_LIMIT_WINDOW_MS: z.string().default('600000'),
+  RUN_RATE_LIMIT_MAX_STARTS: z.string().default('6'),
   SESSION_SECRET: z.string().default('change-me-for-local-dev'),
   ENABLE_DEMO_RESET: z.string().default('true'),
 });
@@ -45,6 +49,10 @@ export function parseConfig(env: Record<string, string | undefined> = process.en
     RUN_TIMEOUT_MS: env.RUN_TIMEOUT_MS,
     MAX_MODEL_CALLS_PER_RUN: env.MAX_MODEL_CALLS_PER_RUN,
     MAX_MODEL_CALLS_PER_SESSION: env.MAX_MODEL_CALLS_PER_SESSION,
+    RATE_LIMIT_WINDOW_MS: env.RATE_LIMIT_WINDOW_MS,
+    RATE_LIMIT_MAX_REQUESTS: env.RATE_LIMIT_MAX_REQUESTS,
+    RUN_RATE_LIMIT_WINDOW_MS: env.RUN_RATE_LIMIT_WINDOW_MS,
+    RUN_RATE_LIMIT_MAX_STARTS: env.RUN_RATE_LIMIT_MAX_STARTS,
     SESSION_SECRET: env.SESSION_SECRET,
     ENABLE_DEMO_RESET: env.ENABLE_DEMO_RESET,
   });

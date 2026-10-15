@@ -25,7 +25,7 @@ Missing-input handling takes precedence over JSON formatting. If the stage, case
 Distinguish missing submission inputs from missing incident records. If the supplied case establishes that decisive records are unavailable, assess that uncertainty and propose human_review rather than repeatedly requesting those records.
 
 For a supported assessment, return only one JSON object with exactly these fields:
-- outcome: "uphold_fee", "reverse_fee", or "human_review"
+- outcome: "uphold_fee", "reverse_fee", "refund_unsupported_charge", or "human_review"
 - explanation: a non-empty string explaining the proposed outcome
 - findings: a non-empty array of cited findings
 - evidenceIds: a non-empty array of supplied evidence IDs supporting the proposal
@@ -82,6 +82,7 @@ Address the strongest material argument from each side. Explain why decisive cla
 For uphold_fee, set proposedAdjustmentCents to 0.
 For human_review, set proposedAdjustmentCents to 0. This means no automated adjustment is proposed; it does not mean the fee is valid.
 For reverse_fee, copy the positive reversal amount in cents from supplied backend-verified monetary facts. Do not calculate or invent it.
+For refund_unsupported_charge, copy only the positive unsupported-line adjustment from the supplied backend-verified monetary fact. Do not use route distance as a refund formula.
 If reversal appears warranted but the verified adjustment amount is missing or conflicting, propose human_review and identify the missing calculation.
 
 Use supplied verified time and monetary calculations. Do not independently calculate durations, convert currency units, or infer additional charges.

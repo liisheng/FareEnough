@@ -5,9 +5,10 @@ import { runRoutes, type ReviewRunner } from './routes/runs.js';
 import { createAutomaticReviews } from './automatic-reviews.js';
 import { getDb } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
-import { HOST, PORT } from './config.js';
+import { config, HOST, PORT } from './config.js';
 import { workspaceRoutes } from './routes/workspace.js';
 import { recoverInterruptedCases } from './workspace.js';
+import { applyRateLimitHeaders, callerKey, FixedWindowRateLimiter, rateLimitValues } from './rate-limit.js';
 
 // ---------------------------------------------------------------------------
 // Fastify server — creates the instance, registers routes, runs migrations
@@ -22,6 +23,9 @@ export async function buildServer(): Promise<ReturnType<typeof Fastify>> {
     },
   });
 
+  const limits = rateLimitValues(config);
+  const requestLimiter = new FixedWindowRateLimiter(limits.maxRequests, limits.requestWindowMs);
+
   app.addHook('onRequest', async (request, reply) => {
     const origin = request.headers.origin;
     if (origin === 'http://127.0.0.1:3000' || origin === 'http://localhost:3000') {
@@ -31,6 +35,11 @@ export async function buildServer(): Promise<ReturnType<typeof Fastify>> {
       reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     }
     if (request.method === 'OPTIONS') return reply.code(204).send();
+    if (request.url !== '/health') {
+      const result = requestLimiter.consume(callerKey(request));
+      applyRateLimitHeaders(reply, result);
+      if (!result.allowed) return reply.code(429).send({ error: 'Too many requests. Retry later.' });
+    }
   });
 
   // Run migrations on startup so the database is always ready.

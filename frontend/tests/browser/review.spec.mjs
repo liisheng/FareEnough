@@ -67,3 +67,47 @@ test('desktop intake, automatic review, evidence keyboard access, audit export a
     expect(errors).toEqual([]);
   } finally {await queue.close();await app.close();closeDb();}
 });
+
+test('mobile route and ERP journey shows the validated 325-cent result without horizontal overflow',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const db=new Database(':memory:');runMigrations(db);setTestDb(db);
+  const app=Fastify();let runner,calls=0;
+  app.get('/health',async()=>({liveAvailable:true}));
+  await app.register(runRoutes,{env:parseConfig({AI_MODE:'live',MODEL_PROVIDER:'adp',ADP_RIDER_APP_KEY:'test',ADP_DRIVER_APP_KEY:'test',ADP_JUDGE_APP_KEY:'test'}),onReady:r=>runner=r,
+    liveProviderFactory:()=>({id:'browser-route-controlled',mode:'live',async generate(request){calls++;return new ReplayModelProvider().generate(request);}})});
+  const queue=createAutomaticReviews(runner,{retryDelaysMs:[0,0]});await app.register(workspaceRoutes,{enqueueReview:queue.enqueue});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.route('http://127.0.0.1:3001/**',async route=>{
+    const req=route.request();
+    if(req.method()==='OPTIONS'){await route.fulfill({status:204,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'*'}});return;}
+    const response=await app.inject({method:req.method(),url:new URL(req.url()).pathname,headers:req.headers(),payload:req.postData()||undefined});
+    await route.fulfill({status:response.statusCode,body:response.body,contentType:'application/json',headers:{'access-control-allow-origin':'*'}});
+  });
+  await page.route('http://127.0.0.1:3000/**',async route=>{
+    const path=new URL(route.request().url()).pathname,file=path==='/'?'index.html':path.slice(1);
+    try{await route.fulfill({body:await readFile(new URL('../../'+file,import.meta.url)),contentType:file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html'});}catch{await route.fulfill({status:404});}
+  });
+  try{
+    await page.goto('http://127.0.0.1:3000/');
+    await expect(page.locator('#trip')).toHaveValue(/^TRIP-/);
+    await page.locator('#category').selectOption('route');
+    await page.locator('#complaint').fill('I agreed to the detour but dispute the separate ERP line.');
+    await page.getByRole('button',{name:'Submit request'}).click();
+    await page.locator('#driver-link').click();
+    await page.locator('#driver-account').fill('The rider approved the detour; please verify the ERP line independently.');
+    await page.getByRole('button',{name:'Submit my account',exact:true}).click();
+    await queue.idle();
+    await page.locator('#support-link').click();
+    await expect(page.getByRole('heading',{name:'Route and additional charge review'})).toBeVisible();
+    await expect(page.locator('#workspace')).toContainText('S$3.25');
+    await expect(page.locator('#workspace')).toContainText('Deterministic confidence: 100%');
+    await page.locator('#audit-panel details').first().locator('summary').click();
+    const citation=page.locator('#audit-panel button[data-citation="fare-erp-001"]').first();
+    await expect(citation).toBeVisible();
+    await citation.focus();await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog')).toContainText('fare-erp-001');
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+    expect(calls).toBe(5);expect(errors).toEqual([]);
+  }finally{await queue.close();await app.close();closeDb();}
+});

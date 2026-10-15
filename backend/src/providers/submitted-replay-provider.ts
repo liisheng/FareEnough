@@ -4,6 +4,7 @@ import type { ModelProviderRequest } from './model-provider.js';
 /** Offline pipeline exercise, never a model assessment of newly submitted accounts. */
 export class SubmittedReplayProvider extends ReplayModelProvider {
   override async generate(request: ModelProviderRequest): Promise<unknown> {
+    if (request.evidence.policyProfile.profileId === 'demo-route-erp-v1') return super.generate(request);
     const submissions = request.evidence.evidence.filter(e => e.kind === 'chat' && e.data.type === 'unverified_party_submission');
     const ids = submissions.map(e => e.id);
     const claim = { text: 'Both parties submitted accounts. Replay cannot assess their truth or resolve disagreements.', evidenceIds: ids, policyRuleIds: [] };

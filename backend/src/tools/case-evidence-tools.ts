@@ -2,7 +2,7 @@ import type { CaseEvidenceResponse } from '../schemas/api.js';
 
 export interface EvidenceRecord {
   id: string;
-  kind: 'dispute' | 'trip' | 'gps' | 'chat' | 'app_event' | 'derived_fact';
+  kind: 'dispute' | 'trip' | 'gps' | 'chat' | 'app_event' | 'derived_fact' | 'fare_line' | 'payment' | 'route_context' | 'party_statement';
   timestamp?: string;
   data: Readonly<Record<string, unknown>>;
 }
@@ -10,7 +10,7 @@ export interface EvidenceRecord {
 export interface PolicyRule {
   id: string;
   text: string;
-  value: number | string;
+  value: number | string | boolean;
 }
 
 export interface AgentEvidenceSnapshot {
@@ -55,8 +55,13 @@ export class CaseEvidenceTools {
       ...projection.chatLogs.map((item, i) => ({ id: `chat-${String(i + 1).padStart(3, '0')}`, kind: 'chat' as const, timestamp: item.timestamp, data: sanitiseRecord(structuredClone(item)) })),
       ...projection.appEvents.map((item, i) => ({ id: `evt-${String(i + 1).padStart(3, '0')}`, kind: 'app_event' as const, timestamp: item.timestamp, data: sanitiseRecord(structuredClone(item)) })),
       ...projection.derivedFacts.map((item) => ({ id: item.id, kind: 'derived_fact' as const, data: structuredClone(item) })),
+      ...projection.additionalEvidence.map((item) => ({ id: item.id, kind: item.kind, timestamp: item.timestamp ?? undefined, data: sanitiseRecord(structuredClone(item.data)) })),
     ];
-    this.policyRules = [
+    this.policyRules = projection.projectedPolicyRules.length ? projection.projectedPolicyRules.map((rule) => ({
+      id: rule.id,
+      text: `[${rule.namespace}] ${rule.text}`,
+      value: rule.value,
+    })) : [
       { id: 'ORG-NS-01', text: 'Recorded cancellation charge in cents', value: projection.cancellationPolicy.cancellationFeeAfterWait * 100 },
       { id: 'ORG-NS-02', text: 'Free wait period in seconds', value: projection.cancellationPolicy.freeWaitTimeMin * 60 },
       { id: 'ORG-NS-03', text: 'No-show threshold in total elapsed seconds', value: projection.cancellationPolicy.noShowThresholdMin * 60 },

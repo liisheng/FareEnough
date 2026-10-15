@@ -138,4 +138,16 @@ describe('deterministic decision validation', () => {
     expect(result.status).toBe('human_review');
     expect(result.amountMinor).toBe(0);
   });
+
+  it('validates only the exact deterministic route/ERP adjustment and normalized action', () => {
+    const context={profileId:'demo-route-erp-v1',evidenceIds:new Set(['fare-erp-001','payment-001','gantry-coverage-001','derived_supported_adjustment']),policyRuleIds:new Set(['PUB-ERP-01','DEMO-ERP-01'])};
+    const proposal={outcome:'refund_unsupported_charge' as const,proposedAdjustmentCents:325,evidenceIds:[...context.evidenceIds],policyRuleIds:[...context.policyRuleIds],explanation:'The paid unsupported line is capped at 325 cents.'};
+    const valid=validateAgentJudgeProposal('CASE-ROUTE',proposal,{value:325,status:'established'},context);
+    expect(valid).toMatchObject({status:'validated',contractDisposition:'claim_upheld',contractAction:'simulate_refund',feeTreatment:'not_applicable',amountMinor:325,confidence:{score:1}});
+    const invalid=validateAgentJudgeProposal('CASE-ROUTE',{...proposal,proposedAdjustmentCents:326},{value:325,status:'established'},context);
+    expect(invalid.status).toBe('human_review');
+    expect(invalid.reasonCodes).toEqual(expect.arrayContaining(['AMOUNT_CONFLICT','INVALID_REVERSAL_AMOUNT']));
+    const uncertain=validateAgentJudgeProposal('CASE-ROUTE',proposal,{value:325,status:'uncertain'},context);
+    expect(uncertain).toMatchObject({status:'human_review',contractAction:'request_human_review',amountMinor:0});
+  });
 });

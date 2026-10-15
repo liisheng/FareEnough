@@ -88,5 +88,7 @@ export function projectCaseEvidence(fixture: Disp002Fixture): CaseEvidenceRespon
       profileId: POLICY_PROFILE_ID,
       version: POLICY_PROFILE_VERSION,
     },
+    additionalEvidence: [],
+    projectedPolicyRules: [],
   };
 }

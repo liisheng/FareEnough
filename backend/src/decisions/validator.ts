@@ -6,6 +6,7 @@ import type {
   HumanReviewDecision,
   JudgeProposal,
 } from './types.js';
+import { calculateConfidence } from './confidence.js';
 
 export const DISP002_EVIDENCE_IDS = new Set([
   'dispute-001',
@@ -51,6 +52,8 @@ function review(input: DecisionValidationInput, reasons: string[], proposal: unk
     policyCitations: parsed.success ? unique(parsed.data.policyCitations) : [],
     reasonCodes: unique(reasons),
     proposal,
+    contractDisposition: 'needs_review', contractAction: 'request_human_review', feeTreatment: 'undetermined',
+    confidence: calculateConfidence({ complete: !reasons.some((r) => r.includes('MISSING') || r.includes('UNSUPPORTED')), corroboration: reasons.some((r) => r.includes('CONFLICT')) ? 'material_conflict' : 'nonmaterial_discrepancy', policyCoverage: reasons.some((r) => r.includes('POLICY') || r.includes('UNSUPPORTED')) ? 'material_gap' : 'complete', citationsValid: !reasons.some((r) => r.includes('CITATION')) }),
   };
 }
 
@@ -58,9 +61,10 @@ function review(input: DecisionValidationInput, reasons: string[], proposal: unk
  * Treats model output as an untrusted proposal. Any malformed, uncited, or
  * deterministically inconsistent proposal is stopped for human review.
  */
-export interface TrustedPolicyContext { profileId: string; evidenceIds: ReadonlySet<string> }
+export interface TrustedPolicyContext { profileId: string; evidenceIds: ReadonlySet<string>; policyRuleIds?: ReadonlySet<string> }
 export function validateDecision(input: DecisionValidationInput, context?: TrustedPolicyContext): DecisionResult {
-  if (input.caseId !== 'DISP-002' && context?.profileId !== 'organizer-disp002-v1') {
+  const routeProfile = context?.profileId === 'demo-route-erp-v1';
+  if (input.caseId !== 'DISP-002' && context?.profileId !== 'organizer-disp002-v1' && !routeProfile) {
     return review(input, ['UNSUPPORTED_CASE'], input.proposal);
   }
 
@@ -77,12 +81,15 @@ export function validateDecision(input: DecisionValidationInput, context?: Trust
   if (evidenceCitations.some((id) => !(context?.evidenceIds ?? DISP002_EVIDENCE_IDS).has(id))) {
     reasons.push('UNKNOWN_EVIDENCE_CITATION');
   }
-  if (policyCitations.some((id) => !DISP002_POLICY_RULE_IDS.has(id))) {
+  const allowedPolicyIds = context?.policyRuleIds ?? DISP002_POLICY_RULE_IDS;
+  if (policyCitations.some((id) => !allowedPolicyIds.has(id))) {
     reasons.push('UNKNOWN_POLICY_CITATION');
   }
   if (proposal.currency !== 'SGD') reasons.push('INVALID_CURRENCY');
 
-  const deterministic = deriveOrganizerOutcome(input.waitingDuration);
+  const deterministic = routeProfile && input.waitingDuration.status === 'established' && input.waitingDuration.value === 325
+    ? { disposition: 'claim_upheld' as const, action: 'reverse_fee' as const, amountMinor: 325 }
+    : routeProfile ? null : deriveOrganizerOutcome(input.waitingDuration);
   if (!deterministic) reasons.push('WAITING_DURATION_NOT_ESTABLISHED');
 
   if (deterministic) {
@@ -93,7 +100,7 @@ export function validateDecision(input: DecisionValidationInput, context?: Trust
 
   // These invariants remain true even if a future policy evaluator changes.
   if (proposal.action === 'uphold_fee' && proposal.amountMinor !== 0) reasons.push('INVALID_UPHOLD_AMOUNT');
-  if (proposal.action === 'reverse_fee' && proposal.amountMinor !== 500) reasons.push('INVALID_REVERSAL_AMOUNT');
+  if (proposal.action === 'reverse_fee' && proposal.amountMinor !== (routeProfile ? 325 : 500)) reasons.push('INVALID_REVERSAL_AMOUNT');
   if (proposal.action === 'none' || proposal.action === 'human_review') reasons.push('INVALID_AUTOMATED_ACTION');
 
   if (reasons.length > 0 || !deterministic) return review(input, reasons, proposal);
@@ -109,12 +116,16 @@ export function validateDecision(input: DecisionValidationInput, context?: Trust
     policyCitations,
     reasonCodes: ['DETERMINISTIC_POLICY_MATCH'],
     proposal,
+    contractDisposition: deterministic.disposition,
+    contractAction: deterministic.action === 'uphold_fee' ? 'no_change' : 'simulate_refund',
+    feeTreatment: routeProfile ? 'not_applicable' : deterministic.action === 'uphold_fee' ? 'upheld' : 'reversed',
+    confidence: calculateConfidence({ complete: true, corroboration: 'consistent', policyCoverage: 'complete', citationsValid: true }),
   };
 }
 
 /** Shape accepted directly from the bounded Judge agent. */
 export interface AgentJudgeProposalInput {
-  outcome: 'uphold_fee' | 'reverse_fee' | 'human_review';
+  outcome: 'uphold_fee' | 'reverse_fee' | 'refund_unsupported_charge' | 'human_review';
   proposedAdjustmentCents: number;
   evidenceIds: string[];
   policyRuleIds: string[];
@@ -137,6 +148,8 @@ export function validateAgentJudgeProposal(
       policyCitations: unique(proposal.policyRuleIds.filter((id) => DISP002_POLICY_RULE_IDS.has(id))),
       reasonCodes: [proposal.outcome === 'human_review' ? 'AGENT_REQUESTED_HUMAN_REVIEW' : 'AGENT_REPORTED_MATERIAL_UNCERTAINTY'],
       proposal,
+      contractDisposition: 'needs_review', contractAction: 'request_human_review', feeTreatment: 'undetermined',
+      confidence: calculateConfidence({ complete: false, corroboration: 'material_conflict', policyCoverage: 'material_gap', citationsValid: true }),
     };
   }
 
@@ -145,7 +158,7 @@ export function validateAgentJudgeProposal(
     waitingDuration,
     proposal: {
       disposition: proposal.outcome === 'uphold_fee' ? 'claim_rejected' : 'claim_upheld',
-      action: proposal.outcome,
+      action: proposal.outcome === 'refund_unsupported_charge' ? 'reverse_fee' : proposal.outcome,
       amountMinor: proposal.proposedAdjustmentCents,
       currency: 'SGD',
       evidenceCitations: proposal.evidenceIds,

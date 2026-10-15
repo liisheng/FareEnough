@@ -66,6 +66,21 @@ export const PolicyProfileRefSchema = z.object({
   version: z.string(),
 });
 
+export const AdditionalEvidenceSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(['fare_line', 'payment', 'route_context', 'party_statement']),
+  timestamp: z.string().nullable().optional(),
+  data: z.record(z.unknown()),
+});
+
+export const ProjectedPolicyRuleSchema = z.object({
+  id: z.string().min(1),
+  namespace: z.enum(['official_rule', 'organizer_rule', 'demo_interpretation']),
+  text: z.string().min(1),
+  value: z.union([z.number(), z.string(), z.boolean()]),
+  sourceIds: z.array(z.string()).min(1),
+});
+
 export const CaseEvidenceResponseSchema = z.object({
   caseId: z.string(),
   dispute: z.object({
@@ -84,6 +99,8 @@ export const CaseEvidenceResponseSchema = z.object({
   cancellationPolicy: SafeCancellationPolicySchema,
   derivedFacts: z.array(DerivedFactSchema),
   policyProfile: PolicyProfileRefSchema,
+  additionalEvidence: z.array(AdditionalEvidenceSchema).default([]),
+  projectedPolicyRules: z.array(ProjectedPolicyRuleSchema).default([]),
 });
 
 // ---------------------------------------------------------------------------

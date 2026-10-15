@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { getDb } from './db/connection.js';
-import { loadDisp002Fixture } from './fixtures/loader.js';
+import { loadDisp002Fixture, loadRouteFixture } from './fixtures/loader.js';
 import { projectCaseEvidence } from './projections/case-projection.js';
+import { projectRouteEvidence } from './projections/route-projection.js';
 
 export type DemoRole = 'rider' | 'driver' | 'support' | 'admin';
 export interface Session { role: DemoRole; actor_id: string }
@@ -39,6 +40,17 @@ export function publicCase(c: WorkspaceCase, session: Session) {
   const result = c.result ? JSON.parse(c.result) : null;
   const d = result?.validatedDecision;
   const finalDecision = getDb().prepare('SELECT * FROM human_decisions WHERE case_id=?').get(c.case_id) as {action:string;amount_minor:number;rationale:string;decided_at:string} | undefined;
+  const isRoute = c.category === 'route';
+  const audience = session.role === 'driver' ? 'driver' : 'rider';
+  const safeExplanation = d?.validationStatus === 'validated'
+    ? isRoute
+      ? audience === 'rider'
+        ? 'The recorded detour was agreed, so no distance-based refund was calculated. The separate ERP line was checked against the complete synthetic gantry and payment records. No supporting gantry was recorded, so the verified 325-cent line is proposed for simulated refund.'
+        : 'The recorded rider agreement resolves the detour allegation. The separate ERP line was unsupported by the complete synthetic gantry record, so only that verified 325-cent line is proposed for simulated refund. This does not imply misconduct by either party.'
+      : audience === 'rider'
+        ? `The selected organizer rule was checked against the corroborated ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value}-second wait. The operational records support arrival and contact attempts; this does not determine your exact position or imply dishonesty.`
+        : `The selected organizer rule was checked against the corroborated ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value}-second wait. Arrival and contact records support the outcome, while the rider's account remains acknowledged without any finding of dishonesty.`
+    : 'A person must review the unresolved evidence or policy issue. No automatic financial adjustment was made.';
   const outcome = finalDecision ? {
     status:'validated', disposition:finalDecision.action==='reverse_fee'?'Fee reversed':'Closed without adjustment',
     amountMinor:finalDecision.amount_minor, feeTreatment:finalDecision.action==='reverse_fee'?'Simulated fee reversal':'No financial adjustment',
@@ -46,17 +58,17 @@ export function publicCase(c: WorkspaceCase, session: Session) {
   } : d ? {
     status: d.validationStatus, disposition: d.dispositionLabel, amountMinor: d.amountMinor,
     feeTreatment: d.feeTreatment, mode: result.mode,
-    explanation: d.validationStatus === 'validated'
-      ? `The selected no-show policy was checked against the recorded waiting duration. ${d.feeTreatment}. Any adjustment is simulated.`
-      : 'A reviewer must assess this case. No automatic financial adjustment was made.',
+    explanation: safeExplanation,
+    action: d.contractAction, confidence: d.confidence,
   } : null;
   const explanationDetails = c.supported && d ? {
-    policyProfile:'organizer-disp002-v1', policyVersion:'1.0.0',
-    facts:[`Recorded waiting duration: ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value} seconds.`, 'The organizer rule uses a corroborated wait start and a threshold of at least 480 seconds.'],
-    evidenceIds:['derived_wait_duration','gps-005','gps-008','evt-004','evt-009'],
-    policyRuleIds:['ORG-NS-03','ORG-NS-04','ORG-NS-05'],
-    opposingEvidence:d.validationStatus==='validated'?'Conflicting accounts were assessed against the recorded waiting evidence. The automated outcome passed the selected policy checks; this does not establish that either party was dishonest.':'The review did not establish a supported automatic outcome. Conflicting or incomplete evidence requires a person to decide.',
-    limitation:'This case uses organizer sample records, not independently retrieved trip telemetry.'
+    policyProfile:isRoute?'demo-route-erp-v1':'organizer-disp002-v1', policyVersion:'1.0.0',
+    facts:isRoute ? ['Actual route was 2,300 metres and 600 seconds above the reference route.', 'The detour was recorded as rider-approved.', 'Paid fare was SGD 21.25; supported total was SGD 18.00; unsupported ERP line was SGD 3.25.'] : [`Recorded waiting duration: ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value} seconds.`, 'The organizer rule uses a corroborated wait start and a threshold of at least 480 seconds.'],
+    evidenceIds:isRoute?['route-reference-001','route-actual-001','route-consent-001','fare-erp-001','payment-001','gantry-coverage-001','derived_supported_adjustment']:['derived_wait_duration','gps-005','gps-008','evt-004','evt-009'],
+    policyRuleIds:isRoute?['DEMO-RT-01','DEMO-RT-02','DEMO-ERP-01','PUB-ERP-01']:['ORG-NS-03','ORG-NS-04','ORG-NS-05'],
+    opposingEvidence:isRoute?'The longer route was considered, but verified consent resolves the route allegation. The ERP line was assessed separately and is unsupported by the complete synthetic gantry record.':d.validationStatus==='validated'?'Conflicting accounts were assessed against the recorded waiting evidence. The automated outcome passed the selected policy checks; this does not establish that either party was dishonest.':'The review did not establish a supported automatic outcome. Conflicting or incomplete evidence requires a person to decide.',
+    limitation:isRoute?'This is a fully synthetic RydeX scenario and uses a labelled demo refund interpretation; it is not a real tariff or payment.':'This case uses organizer sample records, not independently retrieved trip telemetry.',
+    confidence:d.confidence,
   } : null;
   const shared = {
     id: c.case_id, tripReference: c.trip_reference, type: c.category, filed: c.filed_at,
@@ -71,9 +83,11 @@ export function publicCase(c: WorkspaceCase, session: Session) {
 }
 export function workspaceProjection(c: WorkspaceCase) {
   if (!c.supported) throw new Error('Unsupported evidence profile');
-  const p = projectCaseEvidence(loadDisp002Fixture());
+  const p = c.category === 'route' ? projectRouteEvidence(loadRouteFixture()) : projectCaseEvidence(loadDisp002Fixture());
   p.caseId = c.case_id;
   p.trip.tripId = c.trip_reference;
+  const payment = p.additionalEvidence.find((item) => item.id === 'payment-001');
+  if (payment) payment.data.paymentId = `PAY-${c.trip_reference}`;
   p.dispute = { ...p.dispute, disputeId: c.case_id, tripId: c.trip_reference, description: c.complaint, filedAt: c.filed_at };
   p.chatLogs.push({ timestamp: c.filed_at, sender: 'rider', type: 'unverified_party_submission', content: c.complaint });
   if (c.driver_account) p.chatLogs.push({ timestamp: c.driver_filed_at!, sender: 'driver', type: 'unverified_party_submission', content: c.driver_account });

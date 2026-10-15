@@ -29,7 +29,7 @@ export const RebuttalSchema = z.object({
 export type Rebuttal = z.infer<typeof RebuttalSchema>;
 
 export const JudgeProposalSchema = z.object({
-  outcome: z.enum(['uphold_fee', 'reverse_fee', 'human_review']),
+  outcome: z.enum(['uphold_fee', 'reverse_fee', 'refund_unsupported_charge', 'human_review']),
   explanation: z.string().min(1),
   findings: z.array(CitedClaimSchema).min(1),
   evidenceIds: z.array(z.string()).min(1),
