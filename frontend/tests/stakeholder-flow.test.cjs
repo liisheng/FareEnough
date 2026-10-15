@@ -6,6 +6,9 @@ test('shared render helpers do not start the removed fixture walkthrough',()=>{
   const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
   const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   assert.doesNotMatch(html,/seeded-rider-view|seeded-support-view|id="review-mode"/);
+  assert.match(html,/styles\/experience\.css/);
+  assert.match(html,/data-scenario="no-show"/);
+  assert.match(fs.readFileSync(path.join(__dirname,'../serve.mjs'),'utf8'),/experience\.css/);
   const window={document:{},fetch(){throw new Error('Unexpected fixture request');}};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../scripts/app.js'),'utf8'),{window});
   assert.equal(typeof window.FareEnoughUI.stageList,'function');
@@ -24,6 +27,11 @@ test('normalizes the seeded evidence projection and renders deterministic facts'
 test('renders route differences, unsupported ERP and deterministic confidence',()=>{
   const payload={dispute:{disputeType:'route'},gpsTelemetry:Array.from({length:4}),chatLogs:[],projectedPolicyRules:Array.from({length:4}),derivedFacts:[
     {id:'derived_route_distance_difference',value:2300},{id:'derived_route_duration_difference',value:600},{id:'derived_supported_adjustment',value:325},
+  ],additionalEvidence:[
+    {id:'route-reference-001',data:{points:[[1.28,103.85],[1.30,103.83]]}},
+    {id:'route-actual-001',data:{points:[[1.28,103.85],[1.27,103.84],[1.30,103.83]]}},
+    {id:'route-consent-001',data:{verified:true}},
+    {id:'gantry-coverage-001',data:{gantriesPassed:[]}},
   ]};
   const ev=ui.evidenceView(payload),routeRun={...run,validatedDecision:{...run.validatedDecision,amountMinor:325,feeTreatment:'Unsupported charge refunded',confidence:{score:1,completeness:1,corroboration:1,policyCoverage:1,citationValidity:1}}};
   assert.match(ui.factStrip(ev),/2300 metres/);
@@ -31,8 +39,19 @@ test('renders route differences, unsupported ERP and deterministic confidence',(
   assert.match(ui.factStrip(ev),/S\$3\.25/);
   const html=ui.supportReady(ev,routeRun);
   assert.match(html,/Route and additional charge review/);
+  assert.match(html,/Reference and actual route comparison/);
+  assert.match(html,/Detour consent checked/);
+  assert.match(html,/No passage recorded/);
   assert.match(html,/Deterministic confidence: 100%/);
   assert.match(html,/not a truthfulness probability/);
+});
+
+test('turns no-show evidence into a readable four-step story',()=>{
+  const story=ui.evidenceStory(ui.evidenceView(evidencePayload));
+  assert.equal((story.match(/<li>/g)||[]).length,4);
+  assert.match(story,/From arrival to fee/);
+  assert.match(story,/480 seconds recorded/);
+  assert.match(story,/derived_wait_duration/);
 });
 
 test('stage progress updates five items from queued through active to complete',()=>{
@@ -98,6 +117,7 @@ test('renders advocate separation, rebuttals, citations and a validated simulate
   assert.match(html,/Rider Advocate rebuttal/);assert.match(html,/Driver Advocate rebuttal/);
   assert.match(html,/CHAT-01/);assert.match(html,/GPS-05/);assert.match(html,/POL-1/);
   assert.match(html,/VALIDATED DECISION/);assert.match(html,/S\$0\.00/);assert.match(html,/Checks passed/);
+  assert.match(html,/Why automation was allowed/);assert.match(html,/Compare advocate briefs and rebuttals/);
   assert.match(html,/No real refund, charge or account action/);
 });
 

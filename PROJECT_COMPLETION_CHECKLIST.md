@@ -14,6 +14,7 @@ Updated for the `Integration` branch on 2026-10-15. Architecture diagrams are tr
 - [x] Separate allowlisted rider and driver explanations, strongest opposing-evidence treatment, limitations, citations, and policy labels.
 - [x] Separate organizer, public Ryde, and synthetic route policy bundles; no silent profile mixing.
 - [x] Route-aware support UI, evidence inspector, confidence breakdown, queue search/filters, mobile layout, and keyboard evidence access.
+- [x] Hackathon demo experience: honest guided presets, evidence timeline, schematic route comparison, visible five-stage deliberation, deterministic safeguard panel, and collapsed deep analysis.
 - [x] Request/run rate limits, provider concurrency and call budgets, strict schemas, citation validation, timeouts, prompt-injection boundaries, and secret-safe errors.
 - [x] Offline verification: TypeScript build, backend tests, frontend tests, and desktop/mobile Playwright journeys.
 - [x] Live Tencent validation: three no-show runs and one route/ERP run; sanitized results are in `eval/LIVE_VALIDATION_2026-10-15.md`.

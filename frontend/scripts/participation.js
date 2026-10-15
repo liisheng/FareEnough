@@ -4,6 +4,11 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const tokens = {}, selected = {}, drafts = new Map();
   const reviewErrors = new Map();
+  const scenarioPresets = {
+    'no-show': {category:'no-show',safety:false,complaint:'I was waiting at the pickup lobby and could not find the car. Please review the arrival, contact and no-show fee evidence.',message:'No-show scenario prepared. Review the account, then submit the real case.'},
+    route: {category:'route',safety:false,complaint:'I agreed to the detour, but I dispute the separate ERP charge. Please verify the route consent, gantry record and paid fare line.',message:'Route and ERP scenario prepared. This is the strongest visual demo path.'},
+    human: {category:'no-show',safety:true,complaint:'This dispute includes a safety concern that requires a person to assess the context before any outcome is considered.',message:'Human hand-off prepared. Safety concerns bypass automatic AI adjudication.'},
+  };
   let auditContext, inspectedRunId;
   let role = 'rider', cases = [], sequence = 0, liveAvailable = false, connectionKnown = false, submitting = false, pendingSubmission;
   const activeRole = () => ['rider','driver','support','admin'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'rider';
@@ -179,6 +184,13 @@
     for(const id of ['search','status-filter','category-filter'])$(`#${id}`).addEventListener('input',render);
     document.addEventListener('click',async e=>{
       const button=e.target.closest('button');if(!button)return;
+      if(button.dataset.scenario){
+        const preset=scenarioPresets[button.dataset.scenario];if(!preset)return;
+        $('#category').value=preset.category;$('#complaint').value=preset.complaint;$('#safety').checked=preset.safety;
+        $('#count').textContent=`${preset.complaint.length} / 2000`;$('#demo-message').textContent=preset.message;
+        document.querySelectorAll?.('[data-scenario]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+        $('#complaint').focus?.();$('#complaint').scrollIntoView?.({behavior:'smooth',block:'center'});return;
+      }
       if(button.dataset.citation){openCitation(button.dataset.citation,button.closest('#evidence-dialog')?inspectedRunId:button.closest('[data-run-id]')?.dataset.runId);return;}
       if(button.id==='close-evidence'){$('#evidence-dialog').close();return;}
       if(button.id==='reload-audit'){loadAudit(selected[role]);return;}

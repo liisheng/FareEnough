@@ -24,6 +24,8 @@ The combined responsive workspace has three views:
 - Rider: submit a complaint for the suggested organizer trip and see its saved status and outcome.
 - Driver: submit an immutable account for an assigned case, with a neutral category summary and own-account export.
 - Support: inspect both accounts, watch automatic Live AI progress, and inspect briefs, rebuttals, Judge proposal and validated result.
+- Guided demo: prepare the no-show, unsupported ERP, or safety-to-human-review story from one honest preset without bypassing the real workflow.
+- Evidence story: read the operational sequence as a timeline, compare reference and actual routes in a schematic overlay, and see the deterministic safeguards that allowed automation or required a person.
 
 Cases, accounts, progress and results are saved in SQLite and restored after refresh. Demo role sessions enforce assigned ownership and role-specific responses on the backend; the persona switch intentionally lets a local presenter assume any demo role and is not production sign-in. Rider and driver APIs/exports omit the opposing narrative and internal model artifacts. Original browser-local requests are not automatically uploaded or deleted.
 

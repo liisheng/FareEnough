@@ -32,6 +32,9 @@ test('desktop intake, automatic review, evidence keyboard access, audit export a
   try {
     await page.goto('http://127.0.0.1:3000/');
     await expect(page.locator('#trip')).toHaveValue(/^TRIP-/);
+    await page.getByRole('button',{name:/No-show evidence/}).click();
+    await expect(page.locator('#category')).toHaveValue('no-show');
+    await expect(page.locator('#demo-message')).toContainText('No-show scenario prepared');
     await page.locator('#complaint').fill('I waited at the lobby and could not find the car.');
     await page.getByRole('button',{name:'Submit request'}).click();
     await expect(page.locator('#rider-cases button')).toHaveCount(1);
@@ -90,8 +93,9 @@ test('mobile route and ERP journey shows the validated 325-cent result without h
   try{
     await page.goto('http://127.0.0.1:3000/');
     await expect(page.locator('#trip')).toHaveValue(/^TRIP-/);
-    await page.locator('#category').selectOption('route');
-    await page.locator('#complaint').fill('I agreed to the detour but dispute the separate ERP line.');
+    await page.getByRole('button',{name:/Unsupported ERP/}).click();
+    await expect(page.locator('#category')).toHaveValue('route');
+    await expect(page.locator('#complaint')).toHaveValue(/separate ERP charge/);
     await page.getByRole('button',{name:'Submit request'}).click();
     await page.locator('#driver-link').click();
     await page.locator('#driver-account').fill('The rider approved the detour; please verify the ERP line independently.');
@@ -99,6 +103,7 @@ test('mobile route and ERP journey shows the validated 325-cent result without h
     await queue.idle();
     await page.locator('#support-link').click();
     await expect(page.getByRole('heading',{name:'Route and additional charge review'})).toBeVisible();
+    await expect(page.getByRole('img',{name:/Reference and actual route comparison/})).toBeVisible();
     await expect(page.locator('#workspace')).toContainText('S$3.25');
     await expect(page.locator('#workspace')).toContainText('Deterministic confidence: 100%');
     await page.locator('#audit-panel details').first().locator('summary').click();
