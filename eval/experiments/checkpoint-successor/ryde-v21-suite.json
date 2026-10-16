@@ -1,0 +1,38 @@
+{
+  "scope": "Evaluation only. Never included in agent requests or runtime evidence.",
+  "policyProfile": "ryde-v2.1",
+  "cases": [
+    {
+      "caseId": "DISP-002", "outcome": "uphold_fee", "adjustmentCents": 0,
+      "basis": "Provided v2.1 sections 2.1–2.3: scheduled-time wait and both contact requirements satisfied.",
+      "stageContract": { "requiredSupportingCitations": [{
+        "id": "relevant_precedent", "stages": ["judge"], "policyRuleIds": ["RYDE-V2.1-7.3"],
+        "basis": "Provided section 7 requires reference to the relevant precedent. Cite a current case fact when explaining the relevant comparison; the precedent is policy context, not current-case evidence."
+      }] }
+    },
+    {
+      "caseId": "DISP-003", "outcome": "reverse_fee", "adjustmentCents": 450,
+      "basis": "Provided v2.1 sections 3.1–3.4: unnotified surge-only fare increase.",
+      "stageContract": { "requiredSupportingCitations": [{
+        "id": "relevant_precedent", "stages": ["judge"], "policyRuleIds": ["RYDE-V2.1-7.2"],
+        "basis": "Provided section 7 requires reference to the relevant precedent. Cite a current case fact when explaining the relevant comparison; the precedent is policy context, not current-case evidence."
+      }] }
+    },
+    {
+      "caseId": "DISP-001", "outcome": "human_review", "adjustmentCents": 0,
+      "basis": "Provided v2.1 section 6.2 requires review for deviation above 2 km. Source sample reference refund is 344 cents; it is not an automatic outcome under this profile.",
+      "stageContract": {
+        "requiredSupportingCitations": [{
+          "id": "mandatory_route_review",
+          "stages": ["rider_brief", "driver_brief", "rider_rebuttal", "driver_rebuttal", "judge"],
+          "anyEvidenceIds": ["trip-001", "derived-ryde-v21-distance"],
+          "policyRuleIds": ["RYDE-V2.1-6.2"],
+          "basis": "Every stage must support its decision path with the supplied route-distance fact and mandatory category restriction. Citation presence still requires a semantic audit of the interpretation."
+        }, {
+          "id": "relevant_precedent", "stages": ["judge"], "policyRuleIds": ["RYDE-V2.1-7.1"],
+          "basis": "Provided section 7 requires reference to the relevant precedent. Cite a current case fact when explaining the relevant comparison; the precedent is policy context, not current-case evidence."
+        }]
+      }
+    }
+  ]
+}

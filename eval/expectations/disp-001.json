@@ -1,0 +1,35 @@
+{
+  "caseId": "DISP-001",
+  "currency": "SGD",
+  "expectedPolicyProfile": "ryde-v2.1",
+  "expectedOutcome": "human_review",
+  "expectedDisposition": "human_review",
+  "expectedAction": "human_review",
+  "expectedAmountMinor": 0,
+  "calculatedReferenceFacts": {
+    "recommendedDistanceKm": 20.5,
+    "actualDistanceKm": 24.8,
+    "deviationKm": 4.3,
+    "distanceRateMinorPerKm": 80,
+    "excessDistanceFareMinor": 344
+  },
+  "referenceSampleOutcome": "partial_refund",
+  "referenceSampleAmountMinor": 344,
+  "referenceSource": "docs/resources/RydeResolve Route Deviation Dataset — DISP-001.md",
+  "referenceFieldPaths": ["case_metadata.expected_ruling", "case_metadata.expected_refund_amount", "recommended_ruling"],
+  "expectationBasis": "Policy v2.1 Section 6.2 requires route-deviation cases above 2 km to be escalated. The 4.3 km deviation therefore requires human review; the original sample recommends a S$3.44 partial refund. Preserve the sample answer as a conflicting reference, not an automatic action.",
+  "conflicts": [
+    {
+      "policySection": "6.2",
+      "sampleExpectedOutcome": "partial_refund",
+      "policyExpectedOutcome": "human_review",
+      "resolution": "Human review must determine the final disposition; do not tune agents to bypass the category threshold."
+    },
+    {
+      "policySection": "1.2",
+      "samplePolicyReference": "Driver Policy §4.2",
+      "resolution": "The source uses an older policy citation. Policy v2.1 Section 1.2 is the current notification provision; do not send the source recommended_ruling or traffic_analysis as evidence."
+    }
+  ],
+  "note": "Evaluation-only expectations. Never imported by runtime/agent code. The reference amount is not an instruction to issue a refund."
+}

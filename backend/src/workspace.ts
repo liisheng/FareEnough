@@ -51,10 +51,12 @@ export function publicCase(c: WorkspaceCase, session: Session) {
       : 'A reviewer must assess this case. No automatic financial adjustment was made.',
   } : null;
   const explanationDetails = c.supported && d ? {
-    policyProfile:'organizer-disp002-v1', policyVersion:'1.0.0',
-    facts:[`Recorded waiting duration: ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value} seconds.`, 'The organizer rule uses a corroborated wait start and a threshold of at least 480 seconds.'],
-    evidenceIds:['derived_wait_duration','gps-005','gps-008','evt-004','evt-009'],
-    policyRuleIds:['ORG-NS-03','ORG-NS-04','ORG-NS-05'],
+    policyProfile:result.policyProfile?.profileId ?? 'organizer-disp002-v1', policyVersion:result.policyProfile?.version ?? '1.0.0',
+    facts: result.policyProfile?.profileId === 'ryde-v2.1'
+      ? ['Policy v2.1 checks five minutes from scheduled pickup, verified driver presence, and both a message and a call before cancellation.']
+      : [`Recorded waiting duration: ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value} seconds.`, 'The organizer rule uses a corroborated wait start and a threshold of at least 480 seconds.'],
+    evidenceIds:d.evidenceCitations ?? [],
+    policyRuleIds:d.policyCitations ?? [],
     opposingEvidence:d.validationStatus==='validated'?'Conflicting accounts were assessed against the recorded waiting evidence. The automated outcome passed the selected policy checks; this does not establish that either party was dishonest.':'The review did not establish a supported automatic outcome. Conflicting or incomplete evidence requires a person to decide.',
     limitation:'This case uses organizer sample records, not independently retrieved trip telemetry.'
   } : null;

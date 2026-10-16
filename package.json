@@ -15,7 +15,9 @@
     "test": "npm run test --workspace backend",
     "test:frontend": "node --test frontend/tests/*.test.cjs",
     "frontend": "node frontend/serve.mjs",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "eval:policy": "npm run build && node backend/scripts/evaluate-policy-fixtures.mjs",
+    "eval:prompts": "npm run build && node backend/scripts/evaluate-prompt-regressions.mjs"
   },
   "engines": {
     "node": ">=20"

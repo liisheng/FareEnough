@@ -6,6 +6,7 @@ import { runMigrations } from '../src/db/migrate.js';
 import { runRoutes } from '../src/routes/runs.js';
 import { parseConfig } from '../src/config.js';
 import { ReplayModelProvider } from '../src/providers/replay-provider.js';
+import type { ModelProviderRequest } from '../src/providers/model-provider.js';
 
 describe('POST case run', () => {
   let db: Database.Database;
@@ -114,5 +115,38 @@ describe('POST case run', () => {
     const response = await app.inject({ method: 'POST', url: '/api/cases/DISP-002/runs', headers: { origin: 'https://other.example' }, payload: { mode: 'replay' } });
     expect(response.statusCode).toBe(403);
     expect(db.prepare('SELECT count(*) AS n FROM agent_runs').get()).toEqual({ n: 0 });
+  });
+
+  it('uses the explicitly selected v2.1 snapshot for all five live stages and saves its policy version', async () => {
+    await app.close();
+    app=Fastify({logger:false});
+    const calls: ModelProviderRequest[]=[];
+    await app.register(runRoutes,{
+      env:parseConfig({AI_MODE:'live',MODEL_PROVIDER:'adp',REVIEW_POLICY_PROFILE:'ryde-v2.1',ADP_RIDER_APP_KEY:'test-rider',ADP_DRIVER_APP_KEY:'test-driver',ADP_JUDGE_APP_KEY:'test-judge'}),
+      liveProviderFactory:()=>({id:'controlled-v21',mode:'live',async generate(request){
+        calls.push(request);
+        const claim={text:'The scheduled-time wait and both contact requirements are supported.',evidenceIds:['derived-ryde-v21-wait','derived-ryde-v21-contact'],policyRuleIds:['RYDE-V2.1-2.1','RYDE-V2.1-2.3']};
+        if(request.stage==='judge')return {outcome:'uphold_fee',explanation:claim.text,findings:[claim],evidenceIds:claim.evidenceIds,policyRuleIds:claim.policyRuleIds,proposedAdjustmentCents:0,uncertainty:[]};
+        const role=request.stage.startsWith('rider')?'rider_advocate':'driver_advocate';
+        return request.stage.endsWith('brief')
+          ? {role,position:claim.text,claims:[claim],adverseEvidence:[],concessions:[],unansweredQuestions:[]}
+          : {role,response:claim.text,challengedClaim:claim.text,claims:[claim],preservedConcessions:[]};
+      }}),
+    });
+    const response=await app.inject({method:'POST',url:'/api/cases/DISP-002/runs',payload:{mode:'live'}});
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({status:'completed',policyProfile:{profileId:'ryde-v2.1',version:'2.1'},validatedDecision:{action:'uphold_fee',amountMinor:0}});
+    expect(calls).toHaveLength(5);
+    for(const call of calls){
+      expect(call.evidence.policyProfile.profileId).toBe('ryde-v2.1');
+      expect(call.evidence.policyRules.every(rule=>rule.id.startsWith('RYDE-V2.1-'))).toBe(true);
+      expect(call.evidence.evidence.find(item=>item.id==='derived-ryde-v21-wait')?.data.policyEligibleWaitSeconds).toBe(360);
+    }
+    const checkpoint=db.prepare('SELECT evidence FROM review_checkpoints').get() as {evidence:string};
+    expect(JSON.parse(checkpoint.evidence)).toEqual(calls[0].evidence);
+    // Historical replay keeps its original threshold and policy references.
+    const replay=await app.inject({method:'POST',url:'/api/cases/DISP-002/runs',payload:{mode:'replay'}});
+    expect(replay.statusCode).toBe(201);
+    expect(replay.json().policyProfile.profileId).toBe('organizer-disp002-v1');
   });
 });

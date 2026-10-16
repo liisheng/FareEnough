@@ -1,0 +1,71 @@
+{
+  "scope": "Reviewed evaluation acceptance only. No model calls or financial actions; raw reports remain unchanged.",
+  "sourceReport": "ryde-v21-2026-10-16T00-14-58.787Z.json",
+  "sourceReportSha256": "sha256:b08fa7876162e40fb911b7c69377efeb5cb1a205787e9fef5d566cb4ee218091",
+  "sourceReview": "ryde-v21-2026-10-16T00-14-58.787Z-semantic-review.json",
+  "sourceReviewSha256": "sha256:2cdf29fc98e6c48a5be4ce3bb298d7e189ace206e142c8df59623c6896c99b60",
+  "createdAt": "2026-10-16T00:25:50.918Z",
+  "status": "failed",
+  "cases": [
+    {
+      "caseId": "DISP-002",
+      "status": "failed",
+      "finalDecisionChecksPassed": false,
+      "stageContractChecksPassed": false,
+      "semanticReviewPassed": false,
+      "failedStageContracts": [
+        "rider_brief",
+        "rider_rebuttal",
+        "driver_rebuttal",
+        "judge"
+      ],
+      "failedSemanticStages": [
+        "rider_brief",
+        "rider_rebuttal",
+        "driver_rebuttal",
+        "judge"
+      ],
+      "pendingSemanticStages": []
+    },
+    {
+      "caseId": "DISP-003",
+      "status": "failed",
+      "finalDecisionChecksPassed": false,
+      "stageContractChecksPassed": false,
+      "semanticReviewPassed": false,
+      "failedStageContracts": [
+        "driver_rebuttal",
+        "judge"
+      ],
+      "failedSemanticStages": [
+        "driver_brief",
+        "rider_rebuttal",
+        "driver_rebuttal",
+        "judge"
+      ],
+      "pendingSemanticStages": []
+    },
+    {
+      "caseId": "DISP-001",
+      "status": "failed",
+      "finalDecisionChecksPassed": false,
+      "stageContractChecksPassed": false,
+      "semanticReviewPassed": false,
+      "failedStageContracts": [
+        "rider_brief",
+        "driver_brief",
+        "rider_rebuttal",
+        "driver_rebuttal",
+        "judge"
+      ],
+      "failedSemanticStages": [
+        "rider_brief",
+        "driver_brief",
+        "rider_rebuttal",
+        "driver_rebuttal",
+        "judge"
+      ],
+      "pendingSemanticStages": []
+    }
+  ]
+}

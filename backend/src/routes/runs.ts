@@ -15,6 +15,8 @@ import { config, isAdpConfigured, type Env } from '../config.js';
 import { findWorkspaceCase, requireSession, workspaceProjection } from '../workspace.js';
 import { createCaseEvidenceTools } from '../tools/case-evidence-tools.js';
 import { SubmittedReplayProvider } from '../providers/submitted-replay-provider.js';
+import { snapshotForNoShowProjection, assessNoShowProjection } from '../policies/ryde-v21.js';
+import { validatePolicyProposal } from '../decisions/policy-validator.js';
 
 const RunBodySchema = z.object({ mode: z.enum(['replay', 'live']), progressId: z.string().uuid().optional() }).strict();
 
@@ -92,6 +94,8 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
     }
 
     const projection = submitted ? workspaceProjection(submitted) : projectCaseEvidence(loadDisp002Fixture());
+    const useV21 = live && env.REVIEW_POLICY_PROFILE === 'ryde-v2.1';
+    const snapshot = useV21 ? snapshotForNoShowProjection(projection) : createCaseEvidenceTools(projection).snapshot();
     const waitFact = projection.derivedFacts.find((fact) => fact.id === 'derived_wait_duration');
     if (!waitFact || typeof waitFact.value !== 'number') {
       return reply.code(500).send({ error: 'Waiting-duration fact is unavailable' });
@@ -112,7 +116,7 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
     if (live) { liveBusy = true; reservedCalls += 5; }
     let provider: ModelProvider | undefined;
     try {
-    getDb().prepare('INSERT INTO review_checkpoints (run_id,case_id,mode,started_at,evidence) VALUES (?,?,?,?,?)').run(runId,id,body.data.mode,startedAt,JSON.stringify(createCaseEvidenceTools(projection).snapshot()));
+    getDb().prepare('INSERT INTO review_checkpoints (run_id,case_id,mode,started_at,evidence) VALUES (?,?,?,?,?)').run(runId,id,body.data.mode,startedAt,JSON.stringify(snapshot));
     const partial: Record<string,unknown> = {};
     provider = live ? (options.liveProviderFactory?.() ?? new AdpModelProvider({
       riderAppKey: env.ADP_RIDER_APP_KEY,
@@ -122,7 +126,7 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       callTimeoutMs: boundedInt(env.MODEL_CALL_TIMEOUT_MS, 60000, 120000),
       runTimeoutMs: boundedInt(env.RUN_TIMEOUT_MS, 240000, 480000),
     })) : submitted ? new SubmittedReplayProvider() : new ReplayModelProvider();
-    const run = await runThreeAgentReview(projection, provider, { runId, onArtifact(stage,value) {
+    const run = await runThreeAgentReview(snapshot, provider, { runId, onArtifact(stage,value) {
       partial[stage]=value;
       getDb().prepare('UPDATE review_checkpoints SET artifacts=? WHERE run_id=?').run(JSON.stringify(partial),runId);
     }, onEvent(event) {
@@ -130,7 +134,7 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       getDb().prepare('UPDATE review_checkpoints SET events=? WHERE run_id=?').run(JSON.stringify(events),runId);
       if (submitted) getDb().prepare('UPDATE workspace_cases SET events = ? WHERE case_id = ?').run(JSON.stringify(events), id);
     } });
-    const decision = validateAgentJudgeProposal(id, run.judgeProposal, {
+    const decision = useV21 ? validatePolicyProposal(snapshot, assessNoShowProjection(projection), run.judgeProposal) : validateAgentJudgeProposal(id, run.judgeProposal, {
       value: waitFact.value,
       status: waitFact.status,
       sourceEvidenceIds: waitFact.sourceEvidenceIds,
@@ -145,11 +149,13 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       ['judge', 'judge', run.judgeProposal],
     ] as const;
     const inputHash = createHash('sha256')
-      .update(JSON.stringify({ caseId: id, mode: body.data.mode, projection, provider: provider.id }))
+      .update(JSON.stringify({ caseId: id, mode: body.data.mode, snapshot, provider: provider.id }))
       .digest('hex');
 
     const response = {
       ...run, mode: body.data.mode,
+      policyProfile: snapshot.policyProfile,
+      policyFacts: snapshot.evidence.filter((item) => item.kind === 'derived_fact'),
       status: decision.status === 'validated' ? 'completed' : 'human_review',
       validatedDecision: displayDecision(decision, run.judgeProposal.explanation, run.judgeProposal.findings.map(f => f.text)),
     };

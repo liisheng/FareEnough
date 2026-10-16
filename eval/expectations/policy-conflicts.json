@@ -1,0 +1,37 @@
+{
+  "policySource": "docs/resources/Document 2 — Ryde Dispute Resolution Policy v2.1 (Markdown).md",
+  "policyVersion": "2.1",
+  "recordedOn": "2026-10-15",
+  "conflicts": [
+    {
+      "id": "NO_SHOW_WAIT_ANCHOR",
+      "caseId": "DISP-002",
+      "existingProfile": "organizer-disp002-v1",
+      "existingRule": "Eight-minute no-show threshold anchored at corroborated arrival/driver_wait_start (08:43).",
+      "newPolicyRule": "Sections 2.1–2.3 require five minutes from scheduled pickup (08:45) plus at least one in-app message and one call before cancellation.",
+      "effect": "Cancellation at 08:51 is 480 seconds after arrival and 360 seconds after scheduled pickup; the original sample satisfies both timing rules, but the rules diverge for other or mutated cases. Explicitly select/version the policy instead of combining thresholds.",
+      "sampleExpectedAmountMinor": 0
+    },
+    {
+      "id": "ROUTE_CATEGORY_ESCALATION",
+      "caseId": "DISP-001",
+      "sampleExpectedOutcome": "partial_refund",
+      "sampleExpectedAmountMinor": 344,
+      "newPolicyRule": "Section 6.2 permits an AI route-deviation ruling only when deviation is at most 2 km and confidence is at least 80%; otherwise escalate.",
+      "effect": "The 4.3 km route deviation mandates human review under v2.1. Preserve the S$3.44 reference calculation for reviewer context; do not perform an automatic refund to match the sample answer."
+    },
+    {
+      "id": "REPUTATION_CALIBRATION_EXCLUDED",
+      "newPolicyRule": "Section 6.3 references party credibility scores and fraud flags.",
+      "projectRule": "FareEnough excludes ratings, account age, dispute history, reputation and fraud-flag profiling from credibility/fault decisions.",
+      "effect": "The original source is retained unchanged for provenance. New normalized fixtures keep only profile IDs, and the runtime policy adapter must explicitly exclude this calibration provision. Source fidelity does not authorize adding profile-based credibility."
+    },
+    {
+      "id": "LIVE_PAYMENT_ACTIONS_EXCLUDED",
+      "newPolicyRule": "Sections 2.2, 2.4 and 6 describe transfers, credits and final AI rulings.",
+      "projectRule": "FareEnough financial actions are simulated and backend-validated; provider proposals do not themselves move funds.",
+      "effect": "Retain source rules without changing the product financial-action boundary."
+    }
+  ],
+  "note": "Evaluation/documentation only. This file is not supplied to agents as case evidence."
+}

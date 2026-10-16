@@ -109,6 +109,11 @@ describe('ADP v2 provider', () => {
       expect(payload.policyRules).toEqual(request().evidence.policyRules);
       expect(payload.policyProfile).toEqual(request().evidence.policyProfile);
       expect(payload.stage).toBe(stages[index]);
+      const claimSchema = payload.responseContract.schema.properties[index === 4 ? 'findings' : 'claims'].items;
+      expect(claimSchema.properties.evidenceIds.items.enum).toEqual(request().evidence.evidence.map(item => item.id));
+      expect(claimSchema.properties.evidenceIds.minItems).toBe(1);
+      expect(claimSchema.properties.policyRuleIds.items.enum).toEqual(request().evidence.policyRules.map(item => item.id));
+      expect(payload.responseContract.schema.required).toContain(index === 4 ? 'outcome' : index < 2 ? 'position' : 'response');
       const riderContext = { stage: 'rider_brief', output: brief };
       const driverContext = { stage: 'driver_brief', output: driverBrief };
       expect(payload.priorOutputs).toEqual(index < 2 ? [] : index === 3
