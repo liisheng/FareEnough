@@ -119,10 +119,25 @@
       });
     }
   }
+  function aiProposalSummary(result) {
+    const proposal=result.judgeProposal || {}, validation=result.validatedDecision;
+    const readable=value=>String(value || 'Not recorded').replaceAll('_',' ').toLowerCase();
+    const outcomes={uphold_fee:'Keep the fee',reverse_fee:'Reverse the fee',refund_unsupported_charge:'Refund the unsupported charge',human_review:'Refer to a human reviewer'};
+    const bullets=items=>'<ul>'+items.map(item=>'<li>'+esc(item)+'</li>').join('')+'</ul>';
+    return '<section class="money-note"><h3>Original AI proposal and validation</h3><h4>AI recommendation</h4><p><strong>'+esc(outcomes[proposal.outcome] || readable(proposal.outcome))+'</strong></p>'+
+      (proposal.explanation?'<p class="account-text">'+esc(proposal.explanation)+'</p>':'')+
+      (Number.isFinite(proposal.proposedAdjustmentCents)?'<p>Proposed simulated adjustment: <strong>S$'+(proposal.proposedAdjustmentCents/100).toFixed(2)+'</strong></p>':'')+
+      (proposal.findings?.length?'<h4>Key findings</h4>'+bullets(proposal.findings.map(f=>f.text)):'')+
+      (proposal.uncertainty?.length?'<h4>Unresolved questions</h4>'+bullets(proposal.uncertainty):'')+
+      '<h4>Validation result</h4><p>'+esc(validation?.status==='human_review'?'Human review required. No automatic financial decision was approved.':validation?.status==='validated'?'The proposal passed the automated checks. All financial adjustments are simulated.':'No completed validation is available.')+'</p>'+
+      (validation?.reasonCodes?.length?'<h4>Reasons</h4>'+bullets(validation.reasonCodes.map(readable)):'')+
+      '<p class="small">This is the original AI assessment. The administrator’s final decision is recorded separately below.</p><details><summary>Technical details (JSON)</summary><pre class="account-text">'+esc(JSON.stringify({proposal:result.judgeProposal,validation},null,2))+'</pre></details></section>';
+  }
+
   function adminPanel(c,head='',draft={}) {
     const decision=c.finalDecision;
     return '<section class="card">'+head+'<p>'+esc(c.reason)+'</p><h3>Rider account</h3><p class="account-text">'+esc(c.complaint)+'</p><h3>Driver account</h3><p class="account-text">'+esc(c.driverAccount||'No driver account received. Missing evidence does not establish fault.')+'</p>'+
-      (c.result?'<details><summary>Original AI proposal and validation</summary><pre class="account-text">'+esc(JSON.stringify({proposal:c.result.judgeProposal,validation:c.result.validatedDecision},null,2))+'</pre></details>':'<p>No completed AI proposal is available.</p>')+
+      (c.result?aiProposalSummary(c.result):'<p>No completed AI proposal is available.</p>')+
       (decision?'<h3>Final admin decision</h3>'+outcome(c)+'<h4>Reviewer rationale</h4><p class="account-text">'+esc(decision.rationale)+'</p><p class="small">Recorded '+esc(decision.decided_at)+'</p>':!['human_review','review_failed'].includes(c.status)?'<p>This case is not awaiting an admin decision.</p>':'<form id="admin-decision-form"><label for="admin-action">Final decision</label><select id="admin-action" required><option value="close_no_adjustment">Close without financial adjustment - SGD 0.00</option>'+(c.supported?'<option value="reverse_fee" '+(draft.action==='reverse_fee'?'selected':'')+'>'+(c.type==='route'?'Refund unsupported ERP - SGD 3.25 simulated':'Reverse no-show fee - SGD 5.00 simulated')+'</option>':'')+'</select><label for="admin-rationale">Decision rationale (internal)</label><textarea id="admin-rationale" rows="6" minlength="10" maxlength="2000" required>'+esc(draft.rationale||'')+'</textarea><p class="small">Explain the evidence and policy supporting your decision. The final decision cannot be overwritten. All adjustments are simulated. Leave the case open if evidence is insufficient.</p><button class="button" type="submit">Submit final decision</button><p id="admin-message" role="status"></p></form>')+'</section>';
   }
 
