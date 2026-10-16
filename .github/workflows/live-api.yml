@@ -1,0 +1,67 @@
+name: Live API tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Tencent ADP suite (all: up to 32 paid calls; sends sample evidence)'
+        type: choice
+        options:
+          - all
+          - smoke
+          - policy
+          - prompts
+        default: all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-adp-tests
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Live Tencent API checks
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment: live-api
+    env:
+      NODE_ENV: test
+      DATABASE_PATH: .runtime/live-api.sqlite
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run selected live suites
+        env:
+          SUITE: ${{ inputs.suite }}
+          ADP_RIDER_APP_KEY: ${{ secrets.ADP_RIDER_APP_KEY }}
+          ADP_DRIVER_APP_KEY: ${{ secrets.ADP_DRIVER_APP_KEY }}
+          ADP_JUDGE_APP_KEY: ${{ secrets.ADP_JUDGE_APP_KEY }}
+        shell: bash
+        run: |
+          for key in ADP_RIDER_APP_KEY ADP_DRIVER_APP_KEY ADP_JUDGE_APP_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing GitHub secret: $key"
+              exit 1
+            fi
+          done
+          status=0
+          if [ "$SUITE" = all ] || [ "$SUITE" = smoke ]; then
+            node backend/scripts/live-adp-smoke.mjs --run || status=1
+          fi
+          if [ "$SUITE" = all ] || [ "$SUITE" = policy ]; then
+            node backend/scripts/evaluate-policy-fixtures.mjs --live --max-calls 15 || status=1
+          fi
+          if [ "$SUITE" = all ] || [ "$SUITE" = prompts ]; then
+            node backend/scripts/evaluate-prompt-regressions.mjs --live --max-calls 12 --delay-ms 10000 || status=1
+          fi
+          exit "$status"

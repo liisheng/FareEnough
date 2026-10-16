@@ -132,6 +132,8 @@ npm install
 
 All commands are Windows-compatible and run from the project root.
 
+GitHub Actions runs the automated suites on pushes and pull requests. See [CI setup](docs/CI.md) for coverage, browser reports, and the manually triggered live Tencent API tests.
+
 | Command | Description |
 | --- | --- |
 | `npm run db:migrate` | Create the SQLite database at `.runtime/fareenough.sqlite` and apply migrations. |
