@@ -2,6 +2,15 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const ui=require('../scripts/app.js');
 
+test('confidence details disclose the threshold and safely render assessment reasons',()=>{
+  const html=ui.decisionCard({mode:'live',status:'human_review',validatedDecision:{validationStatus:'human_review',amountMinor:0,confidence:{score:0.85,completeness:1,corroboration:0.5,policyCoverage:1,citationValidity:1,threshold:0.85,explanations:['A material gate still requires review.','<script>unsafe()</script>']}}});
+  assert.match(html,/Deterministic confidence: 85%/);
+  assert.match(html,/at least 85% and all mandatory checks/);
+  assert.match(html,/A material gate still requires review/);
+  assert.match(html,/&lt;script&gt;/);
+  assert.doesNotMatch(html,/<script>/);
+});
+
 test('shared render helpers do not start the removed fixture walkthrough',()=>{
   const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
   const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');

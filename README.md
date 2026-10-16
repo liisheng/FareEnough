@@ -167,6 +167,8 @@ GitHub Actions runs the automated suites on pushes and pull requests. See [CI se
 
 ### Three-agent baseline
 
+Automatic decisions require the [deterministic confidence gate](docs/CONFIDENCE.md): an evidence-based score of at least 0.85 and all mandatory checks. Each new assessment saves its checklist, evidence references and reasons. This rubric does not substitute for v2.1's independently calibrated confidence requirement.
+
 - Rider Advocate and Driver Advocate receive independent initial contexts.
 - Each advocate gets one rebuttal with both its own original brief and the other side's brief. Neither advocate sees the other's rebuttal; each can preserve its own concessions.
 - The Judge receives both briefs and both rebuttals, then returns a structured proposal with evidence and policy citations.

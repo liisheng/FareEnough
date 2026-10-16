@@ -143,7 +143,7 @@ export async function runRoutes(app: FastifyInstance, options: RunRoutesOptions 
       status: decisionFact.status,
       sourceEvidenceIds: decisionFact.sourceEvidenceIds,
       policyRuleIds: decisionFact.policyRuleIds,
-    }, submitted ? { profileId: projection.policyProfile.profileId, evidenceIds: new Set(createCaseEvidenceTools(projection).getEvidence().map(e => e.id)), policyRuleIds: new Set(createCaseEvidenceTools(projection).getPolicyRules().map(r => r.id)) } : undefined);
+    }, { profileId: snapshot.policyProfile.profileId, evidenceIds: new Set(snapshot.evidence.map(e => e.id)), policyRuleIds: new Set(snapshot.policyRules.map(r => r.id)), snapshot });
     const completedAt = new Date().toISOString();
     const artifacts = [
       ['rider_brief', 'rider_advocate', run.riderBrief],

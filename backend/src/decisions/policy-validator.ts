@@ -1,7 +1,8 @@
 import { JudgeProposalSchema } from '../agents/schemas.js';
 import type { AgentEvidenceSnapshot, EvidenceRecord } from '../tools/case-evidence-tools.js';
 import type { DecisionResult } from './types.js';
-import { calculateConfidence } from './confidence.js';
+import { confidenceGateReasons } from './confidence.js';
+import { assessEvidenceConfidence } from './evidence-confidence.js';
 
 export interface AssessedPolicyOutcome {
   outcome: 'uphold_fee' | 'reverse_fee' | 'human_review';
@@ -63,18 +64,15 @@ export function validatePolicyProposal(
     || (assessment.outcome !== 'reverse_fee' && assessment.adjustmentCents !== 0)) reasons.push('INVALID_POLICY_ASSESSMENT');
   const evidenceCitations = [...new Set((proposal?.evidenceIds ?? []).filter((id) => evidence.has(id)))];
   const policyCitations = [...new Set((proposal?.policyRuleIds ?? []).filter((id) => rules.has(id)))];
+  const confidence = assessEvidenceConfidence(snapshot, !!proposal && !reasons.some(reason => /CITATION|GROUNDING|UNCITED/.test(reason)));
+  reasons.push(...confidenceGateReasons(confidence));
   if (reasons.length || !proposal || assessment.outcome === 'human_review') {
     return {
       status: 'human_review', caseId: snapshot.caseId, disposition: null, action: 'human_review',
       amountMinor: 0, currency: 'SGD', evidenceCitations, policyCitations,
       reasonCodes: [...new Set(reasons)], proposal: rawProposal,
       contractDisposition: 'needs_review', contractAction: 'request_human_review', feeTreatment: 'undetermined',
-      confidence: calculateConfidence({
-        complete: !reasons.some(reason => /MISSING|UNCITED|INVALID_PROPOSAL|UNCERTAINTY|REQUIRES_REVIEW/.test(reason)),
-        corroboration: reasons.some(reason => /CONFLICT|UNCERTAINTY|REQUIRES_REVIEW/.test(reason)) ? 'material_conflict' : 'nonmaterial_discrepancy',
-        policyCoverage: reasons.some(reason => /POLICY|INVALID_PROPOSAL/.test(reason)) ? 'material_gap' : 'complete',
-        citationsValid: !reasons.some(reason => /CITATION|GROUNDING|UNCITED|INVALID_PROPOSAL/.test(reason)),
-      }),
+      confidence,
     };
   }
   const disposition = assessment.outcome === 'uphold_fee' ? 'claim_rejected' : 'claim_upheld';
@@ -85,7 +83,7 @@ export function validatePolicyProposal(
     contractDisposition: disposition,
     contractAction: assessment.outcome === 'uphold_fee' ? 'no_change' : 'simulate_refund',
     feeTreatment: assessment.outcome === 'uphold_fee' ? 'upheld' : 'reversed',
-    confidence: calculateConfidence({ complete: true, corroboration: 'consistent', policyCoverage: 'complete', citationsValid: true }),
+    confidence,
     proposal: { disposition, action: assessment.outcome, amountMinor: proposal.proposedAdjustmentCents,
       currency: 'SGD', evidenceCitations, policyCitations, rationale: proposal.explanation },
   };

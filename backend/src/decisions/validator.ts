@@ -6,7 +6,10 @@ import type {
   HumanReviewDecision,
   JudgeProposal,
 } from './types.js';
-import { calculateConfidence } from './confidence.js';
+import { confidenceGateReasons } from './confidence.js';
+import { assessEvidenceConfidence } from './evidence-confidence.js';
+import type { AgentEvidenceSnapshot } from '../tools/case-evidence-tools.js';
+import type { DecisionConfidence } from './types.js';
 
 export const DISP002_EVIDENCE_IDS = new Set([
   'dispute-001',
@@ -39,7 +42,7 @@ function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-function review(input: DecisionValidationInput, reasons: string[], proposal: unknown): HumanReviewDecision {
+function review(input: DecisionValidationInput, reasons: string[], proposal: unknown, confidence: DecisionConfidence): HumanReviewDecision {
   const parsed = ProposalSchema.safeParse(proposal);
   return {
     status: 'human_review',
@@ -53,7 +56,7 @@ function review(input: DecisionValidationInput, reasons: string[], proposal: unk
     reasonCodes: unique(reasons),
     proposal,
     contractDisposition: 'needs_review', contractAction: 'request_human_review', feeTreatment: 'undetermined',
-    confidence: calculateConfidence({ complete: !reasons.some((r) => r.includes('MISSING') || r.includes('UNSUPPORTED')), corroboration: reasons.some((r) => r.includes('CONFLICT')) ? 'material_conflict' : 'nonmaterial_discrepancy', policyCoverage: reasons.some((r) => r.includes('POLICY') || r.includes('UNSUPPORTED')) ? 'material_gap' : 'complete', citationsValid: !reasons.some((r) => r.includes('CITATION')) }),
+    confidence,
   };
 }
 
@@ -61,16 +64,19 @@ function review(input: DecisionValidationInput, reasons: string[], proposal: unk
  * Treats model output as an untrusted proposal. Any malformed, uncited, or
  * deterministically inconsistent proposal is stopped for human review.
  */
-export interface TrustedPolicyContext { profileId: string; evidenceIds: ReadonlySet<string>; policyRuleIds?: ReadonlySet<string> }
+export interface TrustedPolicyContext { profileId: string; evidenceIds: ReadonlySet<string>; policyRuleIds?: ReadonlySet<string>; snapshot?: AgentEvidenceSnapshot }
 export function validateDecision(input: DecisionValidationInput, context?: TrustedPolicyContext): DecisionResult {
   const routeProfile = context?.profileId === 'demo-route-erp-v1';
+  if (context && context.profileId !== 'organizer-disp002-v1' && !routeProfile) {
+    return review(input, ['UNSUPPORTED_POLICY_PROFILE'], input.proposal, assessEvidenceConfidence(context.snapshot, false));
+  }
   if (input.caseId !== 'DISP-002' && context?.profileId !== 'organizer-disp002-v1' && !routeProfile) {
-    return review(input, ['UNSUPPORTED_CASE'], input.proposal);
+    return review(input, ['UNSUPPORTED_CASE'], input.proposal, assessEvidenceConfidence(context?.snapshot, false));
   }
 
   const parsed = ProposalSchema.safeParse(input.proposal);
   if (!parsed.success) {
-    return review(input, ['INVALID_PROPOSAL_SCHEMA'], input.proposal);
+    return review(input, ['INVALID_PROPOSAL_SCHEMA'], input.proposal, assessEvidenceConfidence(context?.snapshot, false));
   }
 
   const proposal: JudgeProposal = parsed.data;
@@ -78,14 +84,18 @@ export function validateDecision(input: DecisionValidationInput, context?: Trust
   const evidenceCitations = unique(proposal.evidenceCitations);
   const policyCitations = unique(proposal.policyCitations);
 
-  if (evidenceCitations.some((id) => !(context?.evidenceIds ?? DISP002_EVIDENCE_IDS).has(id))) {
+  const availableEvidence = context?.snapshot ? new Set(context.snapshot.evidence.map(record => record.id)) : context?.evidenceIds ?? DISP002_EVIDENCE_IDS;
+  if (evidenceCitations.some((id) => !availableEvidence.has(id))) {
     reasons.push('UNKNOWN_EVIDENCE_CITATION');
   }
-  const allowedPolicyIds = context?.policyRuleIds ?? DISP002_POLICY_RULE_IDS;
+  const allowedPolicyIds = context?.snapshot ? new Set(context.snapshot.policyRules.map(rule => rule.id)) : context?.policyRuleIds ?? DISP002_POLICY_RULE_IDS;
   if (policyCitations.some((id) => !allowedPolicyIds.has(id))) {
     reasons.push('UNKNOWN_POLICY_CITATION');
   }
   if (proposal.currency !== 'SGD') reasons.push('INVALID_CURRENCY');
+  if (context?.snapshot && (context.snapshot.caseId !== input.caseId || context.snapshot.policyProfile.profileId !== context.profileId)) reasons.push('CONFIDENCE_CONTEXT_MISMATCH');
+  const snapshotFact = context?.snapshot?.evidence.find(record => record.id === (routeProfile ? 'derived_supported_adjustment' : 'derived_wait_duration'));
+  if (snapshotFact && (snapshotFact.data.value !== input.waitingDuration.value || snapshotFact.data.status !== input.waitingDuration.status)) reasons.push('DECISION_FACT_CONFLICT');
 
   const deterministic = routeProfile && input.waitingDuration.status === 'established' && input.waitingDuration.value === 325
     ? { disposition: 'claim_upheld' as const, action: 'reverse_fee' as const, amountMinor: 325 }
@@ -103,7 +113,9 @@ export function validateDecision(input: DecisionValidationInput, context?: Trust
   if (proposal.action === 'reverse_fee' && proposal.amountMinor !== (routeProfile ? 325 : 500)) reasons.push('INVALID_REVERSAL_AMOUNT');
   if (proposal.action === 'none' || proposal.action === 'human_review') reasons.push('INVALID_AUTOMATED_ACTION');
 
-  if (reasons.length > 0 || !deterministic) return review(input, reasons, proposal);
+  const confidence = assessEvidenceConfidence(context?.snapshot, !reasons.some(reason => reason.includes('CITATION')));
+  reasons.push(...confidenceGateReasons(confidence));
+  if (reasons.length > 0 || !deterministic) return review(input, reasons, proposal, confidence);
 
   return {
     status: 'validated',
@@ -119,7 +131,7 @@ export function validateDecision(input: DecisionValidationInput, context?: Trust
     contractDisposition: deterministic.disposition,
     contractAction: deterministic.action === 'uphold_fee' ? 'no_change' : 'simulate_refund',
     feeTreatment: routeProfile ? 'not_applicable' : deterministic.action === 'uphold_fee' ? 'upheld' : 'reversed',
-    confidence: calculateConfidence({ complete: true, corroboration: 'consistent', policyCoverage: 'complete', citationsValid: true }),
+    confidence,
   };
 }
 
@@ -151,7 +163,7 @@ export function validateAgentJudgeProposal(
       reasonCodes: [unsupportedOutcome ? 'UNSUPPORTED_OUTCOME_FOR_POLICY_PROFILE' : proposal.outcome === 'human_review' ? 'AGENT_REQUESTED_HUMAN_REVIEW' : 'AGENT_REPORTED_MATERIAL_UNCERTAINTY'],
       proposal,
       contractDisposition: 'needs_review', contractAction: 'request_human_review', feeTreatment: 'undetermined',
-      confidence: calculateConfidence({ complete: false, corroboration: 'material_conflict', policyCoverage: 'material_gap', citationsValid: true }),
+      confidence: assessEvidenceConfidence(context?.snapshot, proposal.evidenceIds.every(id => (context?.evidenceIds ?? DISP002_EVIDENCE_IDS).has(id)) && proposal.policyRuleIds.every(id => (context?.policyRuleIds ?? DISP002_POLICY_RULE_IDS).has(id))),
     };
   }
 

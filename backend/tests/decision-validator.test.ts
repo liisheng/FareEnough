@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateAgentJudgeProposal, validateDecision } from '../src/decisions/validator.js';
+import { organizerContext, routeContext } from './helpers/confidence-context.js';
 
 const validProposal = {
   disposition: 'claim_rejected' as const,
@@ -19,7 +20,7 @@ describe('deterministic decision validation', () => {
       caseId: 'DISP-002',
       proposal: validProposal,
       waitingDuration: established480,
-    });
+    }, organizerContext());
 
     expect(result.status).toBe('validated');
     expect(result.disposition).toBe('claim_rejected');
@@ -95,7 +96,7 @@ describe('deterministic decision validation', () => {
         amountMinor: 500,
       },
       waitingDuration: { value: 479, status: 'established' },
-    });
+    }, organizerContext(479));
 
     expect(result.status).toBe('validated');
     expect(result.action).toBe('reverse_fee');
@@ -109,7 +110,7 @@ describe('deterministic decision validation', () => {
       evidenceIds: ['dispute-001', 'gps-005', 'derived_wait_duration'],
       policyRuleIds: ['ORG-NS-03'],
       explanation: 'Operational evidence meets the configured threshold.',
-    }, established480);
+    }, established480, organizerContext());
 
     expect(result.status).toBe('validated');
     expect(result.action).toBe('uphold_fee');
@@ -140,7 +141,7 @@ describe('deterministic decision validation', () => {
   });
 
   it('validates only the exact deterministic route/ERP adjustment and normalized action', () => {
-    const context={profileId:'demo-route-erp-v1',evidenceIds:new Set(['fare-erp-001','payment-001','gantry-coverage-001','derived_supported_adjustment']),policyRuleIds:new Set(['PUB-ERP-01','DEMO-ERP-01'])};
+    const context=routeContext();
     const proposal={outcome:'refund_unsupported_charge' as const,proposedAdjustmentCents:325,evidenceIds:[...context.evidenceIds],policyRuleIds:[...context.policyRuleIds],explanation:'The paid unsupported line is capped at 325 cents.'};
     const valid=validateAgentJudgeProposal('CASE-ROUTE',proposal,{value:325,status:'established'},context);
     expect(valid).toMatchObject({status:'validated',contractDisposition:'claim_upheld',contractAction:'simulate_refund',feeTreatment:'not_applicable',amountMinor:325,confidence:{score:1}});

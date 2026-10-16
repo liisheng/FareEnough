@@ -10,6 +10,9 @@ export interface DecisionConfidence {
   citationValidity: number;
   explanations: string[];
   rubricVersion: '1';
+  assessmentVersion?: 'evidence-checklist-v1';
+  threshold?: number;
+  checks?: Array<{ id: string; component: 'completeness' | 'corroboration' | 'policyCoverage' | 'citationValidity'; passed: boolean; evidenceIds: string[]; reason: string }>;
 }
 
 export interface JudgeProposal {

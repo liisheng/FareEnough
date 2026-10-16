@@ -52,6 +52,9 @@ it('persists intake, scopes party accounts, executes all five stages with both s
   const driver=await app.inject({url:`/api/workspace/cases/${id}`,headers:headers('driver')});expect(driver.body).not.toContain('RIDER_PRIVATE');
   const support=(await app.inject({url:`/api/workspace/cases/${id}`,headers:headers('support')})).json();
   expect(support.events).toHaveLength(10);expect(support.result.riderBrief.role).toBe('rider_advocate');
+  const audit=(await app.inject({url:`/api/workspace/cases/${id}/audit`,headers:headers('support')})).json();
+  expect(audit.runs[0].decision.confidence).toEqual(support.result.validatedDecision.confidence);
+  expect(audit.runs[0].decision.confidence).toMatchObject({assessmentVersion:'evidence-checklist-v1',threshold:0.85});
   expect(db.prepare('SELECT count(*) AS n FROM agent_artifacts WHERE run_id = ?').get(support.runId)).toEqual({n:5});
   // Repeating finalization cannot execute another model run or another action.
   expect((await run(id)).statusCode).toBe(200);expect(calls).toHaveLength(5);

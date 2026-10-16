@@ -1,5 +1,6 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { PersistCompletedRunInput, PersistCompletedRunResult } from './types.js';
+import { confidenceGateReasons } from '../decisions/confidence.js';
 
 function json(value: unknown): string {
   return JSON.stringify(value ?? null);
@@ -25,6 +26,7 @@ export function persistCompletedRun(
   input: PersistCompletedRunInput,
 ): PersistCompletedRunResult {
   if (input.decision.caseId !== input.caseId) throw new Error('Decision case does not match run case');
+  if (input.decision.status === 'validated' && confidenceGateReasons(input.decision.confidence).length) throw new Error('Automatic decision failed confidence gate');
   if (input.artifacts.some((item) => !item.artifactId || !item.stage || !item.actor)) {
     throw new Error('Artifact identifiers, stages, and actors are required');
   }
@@ -111,11 +113,12 @@ export function persistCompletedRun(
     const evidence = json(decision.evidenceCitations);
     const policies = json(decision.policyCitations);
     const reasonCodes = json(decision.reasonCodes);
+    const confidence = json(decision.confidence);
     db.prepare(`
       INSERT OR IGNORE INTO decisions
         (decision_id, run_id, case_id, validation_status, disposition, action,
-         amount_minor, currency, evidence_citations, policy_citations, reason_codes, proposal)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         amount_minor, currency, evidence_citations, policy_citations, reason_codes, proposal, confidence_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       input.decisionId,
       input.runId,
@@ -129,11 +132,12 @@ export function persistCompletedRun(
       policies,
       reasonCodes,
       proposal,
+      confidence,
     );
 
     const decisionRow = db.prepare(`
       SELECT decision_id, run_id, case_id, validation_status, disposition, action,
-             amount_minor, currency, evidence_citations, policy_citations, reason_codes, proposal
+             amount_minor, currency, evidence_citations, policy_citations, reason_codes, proposal, confidence_json
       FROM decisions WHERE run_id = ?
     `).get(input.runId) as Record<string, unknown> | undefined;
     assertExistingValue(decisionRow, {
@@ -149,6 +153,7 @@ export function persistCompletedRun(
       policy_citations: policies,
       reason_codes: reasonCodes,
       proposal,
+      confidence_json: confidence,
     }, 'Decision');
 
     let actionId: string | null = null;

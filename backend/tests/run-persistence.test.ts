@@ -4,6 +4,7 @@ import { runMigrations } from '../src/db/migrate.js';
 import { validateDecision } from '../src/decisions/validator.js';
 import { persistCompletedRun } from '../src/persistence/run-repository.js';
 import type { PersistCompletedRunInput } from '../src/persistence/types.js';
+import { organizerContext } from './helpers/confidence-context.js';
 
 function validatedDecision() {
   return validateDecision({
@@ -17,7 +18,7 @@ function validatedDecision() {
       evidenceCitations: ['gps-005', 'gps-008'],
       policyCitations: ['ORG-NS-03'],
     },
-  });
+  }, organizerContext());
 }
 
 function completedRun(): PersistCompletedRunInput {
@@ -60,6 +61,9 @@ describe('agent run persistence', () => {
     expect((db.prepare('SELECT count(*) AS count FROM agent_artifacts').get() as any).count).toBe(3);
     expect((db.prepare('SELECT count(*) AS count FROM run_events').get() as any).count).toBe(2);
     expect((db.prepare('SELECT count(*) AS count FROM decisions').get() as any).count).toBe(1);
+    const saved = JSON.parse((db.prepare('SELECT confidence_json FROM decisions').get() as { confidence_json: string }).confidence_json);
+    expect(saved).toEqual(completedRun().decision.confidence);
+    expect(saved).toMatchObject({ score: 1, threshold: 0.85, assessmentVersion: 'evidence-checklist-v1' });
     expect((db.prepare('SELECT count(*) AS count FROM simulated_actions').get() as any).count).toBe(0);
   });
 
@@ -101,5 +105,21 @@ describe('agent run persistence', () => {
       .toThrow(/idempotency conflict/);
     expect((db.prepare('SELECT count(*) AS count FROM agent_runs').get() as any).count).toBe(1);
     expect((db.prepare('SELECT count(*) AS count FROM simulated_actions').get() as any).count).toBe(0);
+  });
+
+  it('rejects a validated decision below the confidence gate before any records are written', () => {
+    const input = completedRun();
+    expect(input.decision.status).toBe('validated');
+    input.decision.confidence.score = 0.84;
+    expect(() => persistCompletedRun(db, input)).toThrow('Automatic decision failed confidence gate');
+    expect(db.prepare('SELECT count(*) AS n FROM agent_runs').get()).toEqual({ n: 0 });
+    expect(db.prepare('SELECT count(*) AS n FROM simulated_actions').get()).toEqual({ n: 0 });
+  });
+
+  it('detects altered confidence inputs when a persisted run ID is reused', () => {
+    const input = completedRun();
+    persistCompletedRun(db, input);
+    input.decision.confidence.explanations.push('Changed audit inputs');
+    expect(() => persistCompletedRun(db, input)).toThrow('Decision idempotency conflict on confidence_json');
   });
 });
