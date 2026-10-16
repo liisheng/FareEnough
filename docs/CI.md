@@ -2,13 +2,11 @@
 
 After these files are pushed to GitHub, **CI / Build and tests** runs on every push and pull request, and can also be started from Actions. It installs the lockfile dependencies with Node 24, builds the backend, and runs:
 
-- `npm test`: backend unit tests, API integration tests, database tests, and controlled ADP transport tests.
-- `npm run test:frontend`: frontend rendering and behavior tests.
-- `npm run test:e2e`: browser journeys with deterministic providers.
+- `npm run test:srs`: builds once, then runs backend unit/API/database tests (including `srs-acceptance.test.ts`), frontend checks, and browser journeys with controlled providers. See [AT-01–AT-41 coverage and gaps](SRS_TEST_COVERAGE.md).
 - `npm run eval:policy`: deterministic policy expectations.
 - `npm run eval:prompts`: prompt scenario inventory only; actual prompt responses are checked in the live workflow.
 
-Ordinary CI receives no ADP keys and makes no live model calls. Browser tests use installed Chromium on CI and Edge locally. Failed browser checks retain screenshots and traces in the browser-report artifact for seven days. Later suites still run after a test failure; failures remain failures for the job.
+Ordinary CI receives no ADP keys and makes no live model calls. The SRS runner also removes ADP keys from child environments and prevents local credential loading. Browser tests use installed Chromium on CI and Edge locally. Failed browser checks retain screenshots and traces in the browser-report artifact for seven days. Independent test suites still run after a test failure; a failed build stops the SRS runner, and any failed suite fails the job.
 
 ## Real API calls
 

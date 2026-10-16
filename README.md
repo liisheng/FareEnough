@@ -130,6 +130,8 @@ npm install
 
 ### Commands
 
+Run `npm run test:srs` for the SRS acceptance/regression checks, including browser journeys. See [SRS test coverage](docs/SRS_TEST_COVERAGE.md) for the AT-01–AT-41 mapping and outstanding acceptance gaps. This command uses controlled providers and makes no live AI calls.
+
 All commands are Windows-compatible and run from the project root.
 
 GitHub Actions runs the automated suites on pushes and pull requests. See [CI setup](docs/CI.md) for coverage, browser reports, and the manually triggered live Tencent API tests.

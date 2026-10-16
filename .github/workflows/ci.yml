@@ -30,16 +30,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - name: Backend and API integration tests
-        if: ${{ !cancelled() && success() }}
-        run: npm test
-      - name: Frontend tests
-        if: ${{ !cancelled() }}
-        run: npm run test:frontend
-      - name: Browser journeys
-        if: ${{ !cancelled() }}
-        run: npm run test:e2e
+      - name: SRS acceptance, regression and browser tests
+        run: npm run test:srs
       - name: Policy fixture checks
         if: ${{ !cancelled() }}
         run: npm run eval:policy

@@ -13,6 +13,7 @@
     "db:migrate": "npm run db:migrate --workspace backend",
     "seed": "npm run seed --workspace backend",
     "test": "npm run test --workspace backend",
+    "test:srs": "node scripts/run-srs-tests.mjs",
     "test:frontend": "node --test frontend/tests/*.test.cjs",
     "frontend": "node frontend/serve.mjs",
     "test:e2e": "npm run build && playwright test",
