@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentStage } from '../agents/schemas.js';
+import { responseContract } from '../agents/response-contract.js';
 import type { ModelProvider, ModelProviderRequest, ProviderOutput } from './model-provider.js';
 
 // Tencent's v2 HTTP SSE contract:
@@ -210,6 +211,7 @@ export class AdpModelProvider implements ModelProvider {
         SystemRole: request.systemPrompt,
         Contents: [{ Type: 'text', Text: JSON.stringify({
           stage: request.stage,
+          responseContract: responseContract(request.stage, request.evidence),
           ...request.evidence,
           priorOutputs: request.priorOutputs.map((output) => ({ stage: priorStage(output), output })),
         }) }],

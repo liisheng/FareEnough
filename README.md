@@ -19,11 +19,12 @@ In another terminal, start the frontend and open http://127.0.0.1:3000:
 npm run frontend
 ```
 
-The combined responsive workspace has three views:
+The combined responsive workspace has four role views:
 
 - Rider: submit a complaint for the suggested organizer trip and see its saved status and outcome.
 - Driver: submit an immutable account for an assigned case, with a neutral category summary and own-account export.
 - Support: inspect both accounts, watch automatic Live AI progress, and inspect briefs, rebuttals, Judge proposal and validated result.
+- Admin: inspect cases requiring a person and record a supported, simulated final decision.
 - Guided demo: prepare the no-show, unsupported ERP, or safety-to-human-review story from one honest preset without bypassing the real workflow.
 - Evidence story: read the operational sequence as a timeline, compare reference and actual routes in a schematic overlay, and see the deterministic safeguards that allowed automation or required a person.
 
@@ -42,11 +43,31 @@ Unknown trips and safety-flagged cases are saved for human review without model 
 
 The Support interface offers live review only. Replay remains an internal testing API and is not offered in the review controls. Technical failures show an explicit retry action; completed live results requiring human judgment do not. Connection interruptions require checking the saved run state before another attempt. The support view enables Live AI only when the backend reports configured ADP access. No model call starts on page load or rider intake. The first saved driver response completes the pair and triggers automatic live review for supported cases. Duplicate responses never trigger another attempt. Cases queue behind active reviews, sharing the existing provider concurrency and call-budget limits. Technical failures retry after 2 and 5 seconds, up to three total attempts. At the limit, Support can click Retry AI review for one additional attempt. Configuration and usage-limit failures stop immediately and remain saved for explicit Support retry; they never fall back to replay. The result displays the actual run mode, and cases needing human review are labeled accordingly.
 
-### Connect published ADP applications
+### Supplied policy v2.1 and regression evaluation
+
+The additional organizer attachments are preserved under `docs/resources/` with SHA-256 hashes. The new runtime fixtures cover route deviation (DISP-001) and unnotified surge pricing (DISP-003); the re-supplied no-show document is identical to the existing DISP-002 source. Expected outcomes and editorial recommendations remain in `eval/` and are never sent to agents.
+
+Select `REVIEW_POLICY_PROFILE=ryde-v2.1` in the server environment for future live no-show reviews to use the supplied policy. The compatibility default is `organizer-disp002-v1`; historical replay keeps that original profile. Each new run saves its actual policy version and evidence snapshot. Existing results are not re-labelled or overwritten. Interactive intake supports the organizer-backed no-show trip and the separate synthetic route/ERP scenario. The supplied v2.1 route-deviation (DISP-001) and surge (DISP-003) samples are evaluated through the fixture evaluator; selecting route in the interactive demo does not select DISP-001 or its policy.
+
+Policy v2.1 uses five minutes from scheduled pickup plus both a message and an in-app call. The sample has 360 eligible seconds (480 seconds since arrival). The route sample's 4.3 km deviation exceeds v2.1's 2 km automatic-review limit, so its source S$3.44 refund recommendation is reviewer context rather than an automatic award. DISP-003 supports a S$4.50 surge-differential refund. Source Section 6.3's reputation-based calibration is deliberately excluded by FareEnough's existing fairness rules. No self-reported model confidence is accepted as a calibrated score; unsupported confidence-dependent cases require review.
+
+Run `npm run eval:policy` to build and check all three deterministic policy expectations without network calls. After explicitly authorizing transmission of the sample evidence to the configured Tencent applications, run `node backend/scripts/evaluate-policy-fixtures.mjs --live --max-calls 15`. Use `--cases DISP-002` to evaluate only that sample. Each selected case makes at most five calls; there are no automatic retries. The evaluator saves each attempt, complete stage outputs, exact policy/evidence inputs, prompt hashes, checks and failures under `eval/live-reports/`. Passing outcome checks does not certify every factual claim or repeated model performance; inspect the artifacts for reasoning quality.
+
+The v2.1 adapter and validator have independent tests for timing boundaries, contact omissions versus missing records, conflicting GPS and surge evidence, safety in submitted accounts, route/monetary thresholds, unknown citations and excessive refund proposals. Backend validation never changes a model's human-review request into an automatic award merely to match a test expectation.
+
+At the user's request, the prompts and model inputs were restored to the earlier focused-validation checkpoint. A fresh complete run passed **12/12 regression checks and 3/3 sample final decisions**: retain the no-show fee, propose a S$4.50 surge reversal, and require route-dispute review. All fifteen sample stages completed. Some initial advocate arguments still contradict policy; these passing automated checks do not establish reliable reasoning at every stage. See the [restoration report](eval/live-reports/restored-checkpoint-2026-10-16.md), which preserves the prior incomplete attempt and remaining limitations. ADP settings were not changed during restoration.
+
+The later [all-stage acceptance target](eval/all-stage-acceptance.md) and [projection/citation experiment](eval/experiments/checkpoint-successor/README.md) are preserved separately. They are not represented as satisfied by this restored checkpoint. Current reports separate final-decision checks, structural stage checks and semantic review. The optional review finalizer creates a separate hash-bound acceptance artifact and preserves failures: `node backend/scripts/finalize-policy-review.mjs --report <raw-report.json> --review <semantic-review.json>`.
+
+Run `npm run eval:prompts` for a no-network inventory of the 12 regression scenarios. After building, `node backend/scripts/evaluate-prompt-regressions.mjs --live --max-calls 12 --delay-ms 10000` runs them against the configured applications with the pacing used in the restored passing run. The delay is optional, is recorded in the report, and does not change inputs, assertions or retry failed requests. The six original advocate prompts and Judge missing-input prompt are preserved exactly; three reconstructed Judge scenarios and two own-brief rebuttal extensions are labeled explicitly. Reports retain raw responses, prompt hashes, machine checks and separate semantic-review status. A machine pass is not a guarantee of correct reasoning or future repeatability.
+
+### ADP connection configuration
 
 Copy `.env.example` to `backend/.env` (ignored by Git). Set `MODEL_PROVIDER=adp`, fill `ADP_RIDER_APP_KEY`, `ADP_DRIVER_APP_KEY`, and `ADP_JUDGE_APP_KEY`, and set `AI_MODE=live` when ready to enable external calls. Never put AppKeys in frontend files, screenshots, logs, or commits. Configuration prefers `backend/.env` and falls back to the repository root `.env` when that file is absent, independent of launch directory. Existing process environment variables take precedence. Relative database paths still resolve against the process working directory; use the npm scripts from the project root consistently.
 
 Run `npm run build`, then `npm start` and `npm run frontend` in separate terminals. Submit both party accounts to start automatic review. Support can retry technical failures. Each run makes at most five ADP calls with separate conversations: two briefs, two rebuttals, and one Judge proposal. Every call receives the full case evidence and selected policy; only the appropriate prior arguments are included. The repository prompt is supplied through ADP's `SystemRole` parameter.
+
+The three base prompt files retain the restored checkpoint text. Only the synthetic `demo-route-erp-v1` profile adds a Judge prompt appendix and response-contract extension for `refund_unsupported_charge`; the supplied v2.1 sample and regression inputs retain their checkpoint contracts.
 
 The v2 SSE endpoint is restricted to `https://wss.lke.tencentcloud.com/adp/v2/chat`, following the [official HTTP SSE API](https://www.tencentcloud.com/document/product/1254/81449). Only the completed assistant reply is parsed. One enclosing JSON code fence is tolerated; arbitrary prose, plain-text clarifications, wrong roles, unknown citations (including adverse evidence), extra fields, and malformed proposals fail validation. Transport and validation failures leave no automatic financial decision, record a sanitized failed run, and never silently fall back to replay.
 
@@ -56,16 +77,18 @@ The local server also rate-limits callers in memory. By default, non-health API 
 
 For an explicitly authorized live smoke test, build first, then run `node scripts/live-adp-smoke.mjs --run` from `backend/`. It temporarily enables ADP for that process, sends the organizer sample for up to five calls, stores the usual local audit trail, and prints only status metadata. Without `--run` it makes no call. Live API verification is separate from passing offline tests.
 
-The deterministic financial evaluator supports the seeded DISP-002 organizer profile and the synthetic `demo-route-erp-v1` profile. It validates zero/500-cent no-show treatment and the route scenario's exact 325-cent unsupported-line adjustment; route distance is never used as a refund formula. The separate `ryde-public-2026-10-07-v1` bundle records bounded public rules and limitations but is not silently substituted for either demo profile. Reported material uncertainty always blocks automatic validation.
+The deterministic financial evaluator supports the seeded DISP-002 organizer profile and the synthetic `demo-route-erp-v1` profile. It validates zero/500-cent no-show treatment and the synthetic route scenario's exact 325-cent unsupported-line adjustment; route distance is never used as a refund formula. The selected v2.1 adapter separately adds the supplied sample cases within the limits described above; it does not establish coverage for arbitrary disputes. The `ryde-public-2026-10-07-v1` bundle records bounded public rules and limitations but is not silently substituted for a selected profile. Reported material uncertainty always blocks automatic validation.
 
 Frontend files are organized as follows:
 
 ```text
 frontend/
-  index.html          Rider, driver and support workspace shells
-  styles/demo.css     Replay workspace styling
-  scripts/app.js      Seeded evidence loading, replay/live trigger and results
+  index.html          Rider, driver, support and admin workspace shells
+  styles/styles.css   Shared responsive workspace styling
+  styles/experience.css  Guided evidence views, motion and responsive queues
+  scripts/app.js      Evidence projections and review result rendering
   scripts/participation.js  API-backed intake, responses, progress and outcomes
+  scripts/experience.js  Motion with reduced-motion support
   assets/             Reserved for images and other static assets
   serve.mjs           Local-only HTTP server
 ```
@@ -118,6 +141,9 @@ All commands are Windows-compatible and run from the project root.
 | `npm start` | Run the compiled server from `backend/dist/`. |
 | `npm test` | Run the backend Vitest suite. |
 | `npm run test:frontend` | Run the existing frontend logic tests (`node --test`). |
+| `npm run test:e2e` | Build and run browser journeys with deterministic providers; no ADP calls. |
+| `npm run eval:policy` | Build and check all three supplied policy sample expectations without network calls. |
+| `npm run eval:prompts` | Build and list the 12 regression scenarios without model calls. |
 | `npm run frontend` | Start the standalone frontend preview on `http://127.0.0.1:3000`. |
 
 ### Endpoints
@@ -154,6 +180,8 @@ The waiting duration is calculated deterministically in code from the `driver_wa
 data/
   fixtures/
     disp-002.json              Evidence only (no expected ruling or editorial summary)
+    disp-001.json              Supplied route-deviation sample evidence
+    disp-003.json              Supplied surge-charge sample evidence
     route-erp-001.json         Fully synthetic route, fare, consent and gantry evidence
   policies/
     organizer-disp002-v1.json  Policy bundle with rules, namespaces, and source IDs
@@ -162,6 +190,7 @@ data/
 eval/
   expectations/
     disp-002.json              Answer key (never imported by runtime code)
+    ryde-v21-suite.json        Three supplied v2.1 sample expectations
   LIVE_VALIDATION_2026-10-15.md  Sanitized measured ADP run summary
 .runtime/                       SQLite database (gitignored)
 ```

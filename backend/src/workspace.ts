@@ -41,12 +41,16 @@ export function publicCase(c: WorkspaceCase, session: Session) {
   const d = result?.validatedDecision;
   const finalDecision = getDb().prepare('SELECT * FROM human_decisions WHERE case_id=?').get(c.case_id) as {action:string;amount_minor:number;rationale:string;decided_at:string} | undefined;
   const isRoute = c.category === 'route';
+  const policyProfile = result?.policyProfile?.profileId ?? (isRoute ? 'demo-route-erp-v1' : 'organizer-disp002-v1');
+  const isV21 = policyProfile === 'ryde-v2.1';
   const audience = session.role === 'driver' ? 'driver' : 'rider';
   const safeExplanation = d?.validationStatus === 'validated'
     ? isRoute
       ? audience === 'rider'
         ? 'The recorded detour was agreed, so no distance-based refund was calculated. The separate ERP line was checked against the complete synthetic gantry and payment records. No supporting gantry was recorded, so the verified 325-cent line is proposed for simulated refund.'
         : 'The recorded rider agreement resolves the detour allegation. The separate ERP line was unsupported by the complete synthetic gantry record, so only that verified 325-cent line is proposed for simulated refund. This does not imply misconduct by either party.'
+      : isV21
+        ? 'Policy v2.1 was checked against the scheduled pickup time, verified driver presence, and the required message and call before cancellation. The outcome reflects those policy checks without a finding of dishonesty. Any adjustment is simulated.'
       : audience === 'rider'
         ? `The selected organizer rule was checked against the corroborated ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value}-second wait. The operational records support arrival and contact attempts; this does not determine your exact position or imply dishonesty.`
         : `The selected organizer rule was checked against the corroborated ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value}-second wait. Arrival and contact records support the outcome, while the rider's account remains acknowledged without any finding of dishonesty.`
@@ -62,10 +66,12 @@ export function publicCase(c: WorkspaceCase, session: Session) {
     action: d.contractAction, confidence: d.confidence,
   } : null;
   const explanationDetails = c.supported && d ? {
-    policyProfile:isRoute?'demo-route-erp-v1':'organizer-disp002-v1', policyVersion:'1.0.0',
-    facts:isRoute ? ['Actual route was 2,300 metres and 600 seconds above the reference route.', 'The detour was recorded as rider-approved.', 'Paid fare was SGD 21.25; supported total was SGD 18.00; unsupported ERP line was SGD 3.25.'] : [`Recorded waiting duration: ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value} seconds.`, 'The organizer rule uses a corroborated wait start and a threshold of at least 480 seconds.'],
-    evidenceIds:isRoute?['route-reference-001','route-actual-001','route-consent-001','fare-erp-001','payment-001','gantry-coverage-001','derived_supported_adjustment']:['derived_wait_duration','gps-005','gps-008','evt-004','evt-009'],
-    policyRuleIds:isRoute?['DEMO-RT-01','DEMO-RT-02','DEMO-ERP-01','PUB-ERP-01']:['ORG-NS-03','ORG-NS-04','ORG-NS-05'],
+    policyProfile, policyVersion:result.policyProfile?.version ?? '1.0.0',
+    facts:isRoute ? ['Actual route was 2,300 metres and 600 seconds above the reference route.', 'The detour was recorded as rider-approved.', 'Paid fare was SGD 21.25; supported total was SGD 18.00; unsupported ERP line was SGD 3.25.']
+      : isV21 ? ['Policy v2.1 checks five minutes from scheduled pickup, verified driver presence, and both a message and a call before cancellation.']
+      : [`Recorded waiting duration: ${workspaceProjection(c).derivedFacts.find(f=>f.id==='derived_wait_duration')?.value} seconds.`, 'The organizer rule uses a corroborated wait start and a threshold of at least 480 seconds.'],
+    evidenceIds:d.evidenceCitations ?? [],
+    policyRuleIds:d.policyCitations ?? [],
     opposingEvidence:isRoute?'The longer route was considered, but verified consent resolves the route allegation. The ERP line was assessed separately and is unsupported by the complete synthetic gantry record.':d.validationStatus==='validated'?'Conflicting accounts were assessed against the recorded waiting evidence. The automated outcome passed the selected policy checks; this does not establish that either party was dishonest.':'The review did not establish a supported automatic outcome. Conflicting or incomplete evidence requires a person to decide.',
     limitation:isRoute?'This is a fully synthetic RydeX scenario and uses a labelled demo refund interpretation; it is not a real tariff or payment.':'This case uses organizer sample records, not independently retrieved trip telemetry.',
     confidence:d.confidence,

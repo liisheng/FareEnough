@@ -150,4 +150,25 @@ describe('deterministic decision validation', () => {
     const uncertain=validateAgentJudgeProposal('CASE-ROUTE',proposal,{value:325,status:'uncertain'},context);
     expect(uncertain).toMatchObject({status:'human_review',contractAction:'request_human_review',amountMinor:0});
   });
+
+  it.each([undefined, 'organizer-disp002-v1', 'ryde-v2.1'])('rejects the route-only refund outcome outside its profile: %s', profileId => {
+    const proposal = {outcome:'refund_unsupported_charge' as const,proposedAdjustmentCents:500,evidenceIds:['derived_wait_duration'],policyRuleIds:['ORG-NS-03']};
+    const context = profileId ? {profileId,evidenceIds:new Set(proposal.evidenceIds),policyRuleIds:new Set(proposal.policyRuleIds)} : undefined;
+    // The same amount and below-threshold fact would validate a no-show reversal;
+    // the route-only outcome must never be silently converted to that action.
+    const result = validateAgentJudgeProposal('DISP-002',proposal,{value:479,status:'established'},context);
+    expect(result).toMatchObject({status:'human_review',action:'human_review',amountMinor:0,reasonCodes:['UNSUPPORTED_OUTCOME_FOR_POLICY_PROFILE'],proposal});
+  });
+
+  it.each(['requested', 'uncertainty'] as const)('preserves only current route policy citations on early review: %s', trigger => {
+    const context = {profileId:'demo-route-erp-v1',evidenceIds:new Set(['fare-erp-001']),policyRuleIds:new Set(['DEMO-ERP-01','PUB-ERP-01'])};
+    const result = validateAgentJudgeProposal('CASE-ROUTE',{
+      outcome:trigger === 'requested' ? 'human_review' : 'refund_unsupported_charge',
+      proposedAdjustmentCents:0,evidenceIds:['fare-erp-001','unknown-evidence'],
+      policyRuleIds:['DEMO-ERP-01','PUB-ERP-01','DEMO-ERP-01','ORG-NS-03','unknown-policy'],
+      uncertainty:trigger === 'uncertainty' ? ['The ERP evidence is materially disputed.'] : [],
+    },{value:325,status:'established'},context);
+    expect(result).toMatchObject({status:'human_review',amountMinor:0,evidenceCitations:['fare-erp-001'],policyCitations:['DEMO-ERP-01','PUB-ERP-01']});
+    expect(result.reasonCodes).toEqual([trigger === 'requested' ? 'AGENT_REQUESTED_HUMAN_REVIEW' : 'AGENT_REPORTED_MATERIAL_UNCERTAINTY']);
+  });
 });

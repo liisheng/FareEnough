@@ -1,13 +1,66 @@
 import { describe, expect, it, vi } from 'vitest';
-import { loadDisp002Fixture } from '../src/fixtures/loader.js';
+import { loadDisp002Fixture, loadRouteFixture } from '../src/fixtures/loader.js';
 import { projectCaseEvidence } from '../src/projections/case-projection.js';
 import { runThreeAgentReview } from '../src/agents/run-coordinator.js';
 import { ReplayModelProvider } from '../src/providers/replay-provider.js';
 import type { ModelProvider, ModelProviderRequest } from '../src/providers/model-provider.js';
-import type { AdvocateBrief, Rebuttal, SafeAgentEvent } from '../src/agents/schemas.js';
+import type { AdvocateBrief, JudgeProposal, Rebuttal, SafeAgentEvent } from '../src/agents/schemas.js';
 import { createCaseEvidenceTools } from '../src/tools/case-evidence-tools.js';
+import { projectRouteEvidence } from '../src/projections/route-projection.js';
+import { loadAgentPrompt } from '../src/agents/prompt-loader.js';
+import { responseContract } from '../src/agents/response-contract.js';
 
 describe('three-agent coordinator', () => {
+  it('rejects the synthetic route outcome when a provider returns it for a no-show case', async () => {
+    const replay = new ReplayModelProvider();
+    const abort = vi.fn();
+    const events: SafeAgentEvent[] = [];
+    const provider: ModelProvider = { id: replay.id, mode: replay.mode, abort, async generate(request) {
+      const output = await replay.generate(request);
+      return request.stage === 'judge'
+        ? { ...output as JudgeProposal, outcome: 'refund_unsupported_charge', proposedAdjustmentCents: 500 }
+        : output;
+    } };
+    await expect(runThreeAgentReview(projectCaseEvidence(loadDisp002Fixture()), provider, {
+      onEvent: event => { events.push(event); },
+    })).rejects.toThrow('Judge outcome is not supported by the selected policy profile');
+    expect(events).toContainEqual(expect.objectContaining({ stage: 'judge', status: 'failed' }));
+    expect(events).not.toContainEqual(expect.objectContaining({ stage: 'judge', status: 'completed' }));
+    expect(abort).toHaveBeenCalledOnce();
+  });
+
+  it('isolates the synthetic route output extension from the validated sample prompts', async () => {
+    const judgePrompt = await loadAgentPrompt('judge');
+    const replay = new ReplayModelProvider();
+    for (const projection of [projectCaseEvidence(loadDisp002Fixture()), projectRouteEvidence(loadRouteFixture())]) {
+      const requests: ModelProviderRequest[] = [];
+      const provider: ModelProvider = { id: replay.id, mode: replay.mode, async generate(request) {
+        requests.push(request);
+        return replay.generate(request);
+      } };
+      await runThreeAgentReview(projection, provider);
+      const judge = requests.find(request => request.stage === 'judge')!;
+      const contract = responseContract('judge', judge.evidence);
+      const outcome = contract.schema.properties.outcome as { enum: string[] };
+      if (projection.policyProfile.profileId === 'demo-route-erp-v1') {
+        expect(judge.systemPrompt.startsWith(judgePrompt)).toBe(true);
+        expect(judge.systemPrompt).toContain('refund_unsupported_charge');
+        expect(judge.systemPrompt).not.toContain('325');
+        expect(outcome.enum).toContain('refund_unsupported_charge');
+      } else {
+        expect(judge.systemPrompt).toBe(judgePrompt);
+        expect(outcome.enum).toEqual(['uphold_fee', 'reverse_fee', 'human_review']);
+      }
+      for (const request of requests.filter(request => request.stage !== 'judge')) {
+        expect(request.systemPrompt).toBe(await loadAgentPrompt(request.stage.startsWith('rider') ? 'rider-advocate' : 'driver-advocate'));
+      }
+    }
+    const snapshot = createCaseEvidenceTools(projectCaseEvidence(loadDisp002Fixture())).snapshot();
+    snapshot.policyProfile = { profileId: 'ryde-v2.1', version: '2.1' };
+    const outcome = responseContract('judge', snapshot).schema.properties.outcome as { enum: string[] };
+    expect(outcome.enum).toEqual(['uphold_fee', 'reverse_fee', 'human_review']);
+  });
+
   it('runs independent briefs, one rebuttal each, then the judge with observable events', async () => {
     const requests: ModelProviderRequest[] = [];
     const replay = new ReplayModelProvider();

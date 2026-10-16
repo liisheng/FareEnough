@@ -140,13 +140,15 @@ export function validateAgentJudgeProposal(
   waitingDuration: DecisionValidationInput['waitingDuration'],
   context?: TrustedPolicyContext,
 ): DecisionResult {
-  if (proposal.outcome === 'human_review' || (proposal.uncertainty?.length ?? 0) > 0) {
+  const unsupportedOutcome = proposal.outcome === 'refund_unsupported_charge'
+    && context?.profileId !== 'demo-route-erp-v1';
+  if (unsupportedOutcome || proposal.outcome === 'human_review' || (proposal.uncertainty?.length ?? 0) > 0) {
     return {
       status: 'human_review', caseId, disposition: null, action: 'human_review',
       amountMinor: 0, currency: 'SGD',
       evidenceCitations: unique(proposal.evidenceIds.filter((id) => (context?.evidenceIds ?? DISP002_EVIDENCE_IDS).has(id))),
-      policyCitations: unique(proposal.policyRuleIds.filter((id) => DISP002_POLICY_RULE_IDS.has(id))),
-      reasonCodes: [proposal.outcome === 'human_review' ? 'AGENT_REQUESTED_HUMAN_REVIEW' : 'AGENT_REPORTED_MATERIAL_UNCERTAINTY'],
+      policyCitations: unique(proposal.policyRuleIds.filter((id) => (context?.policyRuleIds ?? DISP002_POLICY_RULE_IDS).has(id))),
+      reasonCodes: [unsupportedOutcome ? 'UNSUPPORTED_OUTCOME_FOR_POLICY_PROFILE' : proposal.outcome === 'human_review' ? 'AGENT_REQUESTED_HUMAN_REVIEW' : 'AGENT_REPORTED_MATERIAL_UNCERTAINTY'],
       proposal,
       contractDisposition: 'needs_review', contractAction: 'request_human_review', feeTreatment: 'undetermined',
       confidence: calculateConfidence({ complete: false, corroboration: 'material_conflict', policyCoverage: 'material_gap', citationsValid: true }),

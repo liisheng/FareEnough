@@ -6,7 +6,7 @@ export type AgentRole = z.infer<typeof AgentRoleSchema>;
 export const CitedClaimSchema = z.object({
   text: z.string().min(1),
   evidenceIds: z.array(z.string()).min(1),
-  policyRuleIds: z.array(z.string()).default([]),
+  policyRuleIds: z.array(z.string()),
 }).strict();
 
 export const AdvocateBriefSchema = z.object({

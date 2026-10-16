@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getDb } from '../db/connection.js';
-import { AI_MODE, isAdpConfigured } from '../config.js';
+import { AI_MODE, config, isAdpConfigured } from '../config.js';
 
 // ---------------------------------------------------------------------------
 // GET /health — returns backend and database readiness.
@@ -25,6 +25,7 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
       database,
       provider,
       mode: AI_MODE,
+      policyProfile: AI_MODE === 'live' ? config.REVIEW_POLICY_PROFILE : 'organizer-disp002-v1',
       liveAvailable: provider,
       timestamp: new Date().toISOString(),
     });
