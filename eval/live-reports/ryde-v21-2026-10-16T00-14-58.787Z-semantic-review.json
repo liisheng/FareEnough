@@ -1,0 +1,190 @@
+{
+  "sourceReport": "ryde-v21-2026-10-16T00-14-58.787Z.json",
+  "sourceReportSha256": "sha256:b08fa7876162e40fb911b7c69377efeb5cb1a205787e9fef5d566cb4ee218091",
+  "sourceReportCompletedAt": "2026-10-16T00:15:47.237Z",
+  "acceptanceContract": "../all-stage-acceptance.md",
+  "scope": "Read-only semantic audit of all 15 required stage slots. Four validated artifacts and one rejected provider response were inspected; ten missing slots are explicitly failed for incomplete execution, without attributing semantic errors to unseen outputs.",
+  "cases": {
+    "DISP-002": {
+      "stages": {
+        "rider_brief": {
+          "status": "failed",
+          "summary": "The raw brief was rejected for two empty evidence citations and again requests review despite the supported wait/contact conditions.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "unvalidatedProviderResponses.rider_brief.claims[5] and claims[8] are standalone policy/glossary summaries with evidenceIds: []. The schema rejection INVALID_AGENT_SCHEMA is warranted; there is no validated Rider brief."
+            },
+            {
+              "severity": "material",
+              "text": "position requires review and unansweredQuestions asks whether the rider was at pickup, but the supplied current measurements establish the accepted wait/contact conditions. No affirmative contrary location evidence or supplied independent-rider-verification prerequisite is identified. Merely adding a question does not make it a required material gap."
+            },
+            {
+              "severity": "material",
+              "text": "adverseEvidence[0] says GPS shows a stationary vehicle 'from arrival through cancellation', while claims[7] correctly acknowledges sampled observations do not establish continuous presence. The broad assertion remains internally inconsistent with the stated evidence limitation."
+            }
+          ]
+        },
+        "driver_brief": {
+          "status": "passed",
+          "summary": "Supports retention using the correct 360-second interval, explicit start/end GPS corroboration, both contact attempts, supported actor attribution and standard fee; fairly acknowledges the rider's account.",
+          "issues": [
+            {
+              "severity": "minor",
+              "text": "claims[1] calls the scheduled-pickup-to-cancellation calculation a 'verified elapsed interval'. Its 360-second value, anchors and derived-wait citation are correct, so this does not substitute the distinct 480-second arrival interval. 'Policy-eligible interval' would be more precise."
+            },
+            {
+              "severity": "minor",
+              "text": "claims[4] combines the cancellation actor, standard fee and 'after the free wait period', but cites only derived-cancellation and derived-fee. Add derived-wait for the timing clause; the calculation is already correctly cited in claims[1]."
+            },
+            {
+              "severity": "minor",
+              "text": "The concession calls the rider's report a 'material opposing claim' without treating it as an automatic review trigger. That is compatible with fair consideration, but the presence of the rider and vehicle should not be presented as mutually exclusive."
+            }
+          ]
+        },
+        "rider_rebuttal": {
+          "status": "failed",
+          "summary": "Not produced after Rider brief schema failure.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No rider_rebuttal artifact, raw response or start event exists. The coordinator stopped this case at the rejected Rider brief."
+            }
+          ]
+        },
+        "driver_rebuttal": {
+          "status": "failed",
+          "summary": "Not produced after Rider brief schema failure.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No driver_rebuttal artifact, raw response or start event exists. Its correctness cannot be inferred from the validated Driver brief."
+            }
+          ]
+        },
+        "judge": {
+          "status": "failed",
+          "summary": "Not produced after Rider brief schema failure.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No Judge call or artifact exists; the expected retention outcome and precedent distinction were not generated or assessed."
+            }
+          ]
+        }
+      }
+    },
+    "DISP-003": {
+      "stages": {
+        "rider_brief": {
+          "status": "passed",
+          "summary": "Correctly supports the 450-cent differential with current sole-surge calculation, explicit notification failure, the decisive section 3.3 application and automatic-value permission.",
+          "issues": []
+        },
+        "driver_brief": {
+          "status": "failed",
+          "summary": "Denies the supported refund while its own claims and concessions establish every relevant refund condition and acknowledge the matching precedent.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "position says notification is only a refund condition and that the rider has not established a violation. claims[6] explicitly states the 3.3 refund rule, claims[7] establishes notification=false, and claims[1] establishes the sole-surge 450-cent difference. The denial directly contradicts these supplied facts and the quoted policy."
+            },
+            {
+              "severity": "material",
+              "text": "concessions acknowledge the required notification was not sent and that DISP-2026-0142 is a similar unnotified-surge refund precedent. The final position still rejects reversal without an applicable distinction or exception; general monetary permission does not supply one."
+            },
+            {
+              "severity": "minor",
+              "text": "claims[6] remains a generic policy-only summary with surge-001 attached, rather than a case-specific application. It should explain that the recorded notification failure triggers the current differential refund."
+            }
+          ]
+        },
+        "rider_rebuttal": {
+          "status": "failed",
+          "summary": "Correctly rebuts the Driver's invented separation of fare validity and refund rights, but repeats a policy-only entry prohibited by the acceptance contract.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "claims[3] merely restates section 3.3 with surge-001 attached instead of applying it to the current notification record. Surrounding claims and response correctly establish the 450-cent refund, but the explicit no-policy-only-entry citation contract is not met. This is a material contract failure, not a stylistic preference or a wrong outcome."
+            }
+          ]
+        },
+        "driver_rebuttal": {
+          "status": "failed",
+          "summary": "Started but no complete response was retained because the ADP stream failed.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "The stage start/failure events and case errorCode ADP_STREAM_INCOMPLETE are recorded. Neither an artifact nor unvalidatedProviderResponses entry exists. Mark incomplete execution, not an unseen semantic failure."
+            }
+          ]
+        },
+        "judge": {
+          "status": "failed",
+          "summary": "Not executed after Driver rebuttal transport failure.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No Judge start event or output exists. A correct final surge decision cannot be credited from the earlier Rider artifacts."
+            }
+          ]
+        }
+      }
+    },
+    "DISP-001": {
+      "stages": {
+        "rider_brief": {
+          "status": "failed",
+          "summary": "Started but failed with no retained complete response.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "ADP_STREAM_INCOMPLETE stopped the Rider brief. There is no artifact or unvalidated provider response to inspect; no claim about its semantic quality is possible."
+            }
+          ]
+        },
+        "driver_brief": {
+          "status": "failed",
+          "summary": "Started but failed with no retained complete response.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "ADP_STREAM_INCOMPLETE stopped the Driver brief. There is no artifact or unvalidated provider response to inspect; no claim about its semantic quality is possible."
+            }
+          ]
+        },
+        "rider_rebuttal": {
+          "status": "failed",
+          "summary": "Not executed after both brief-stage transport failures.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No start event, artifact or raw response exists for rider_rebuttal."
+            }
+          ]
+        },
+        "driver_rebuttal": {
+          "status": "failed",
+          "summary": "Not executed after both brief-stage transport failures.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No start event, artifact or raw response exists for driver_rebuttal."
+            }
+          ]
+        },
+        "judge": {
+          "status": "failed",
+          "summary": "Not executed after both brief-stage transport failures.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No Judge start event or output exists. The required current-distance/precedent comparison and human-review decision were not generated."
+            }
+          ]
+        }
+      }
+    }
+  }
+}

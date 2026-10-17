@@ -1,5 +1,7 @@
 # FareEnough Software Requirements Specification
 
+> **Scope amendment — 12 October 2026 (user approved):** Rider and driver now both submit independent accounts linked to the same trip/dispute. The driver receives a neutral category summary, submits their own narrative, and sees their own status/explanation. Support sees both accounts. Missing responses never establish fault; uncertainty requires human review. This amendment supersedes earlier exclusions of a driver portal/response workflow in this document. External notifications remain out of scope. The current frontend implements browser-local participation only; server-side driver ownership, role projections, response persistence, and corresponding API contracts remain required backend work. No response deadline or automatic default judgment is specified.
+
 Version: 1.0 draft for implementation  
 Date: 7 October 2026  
 Project: Tencent Cloud AI CAN DO IT Hackathon Singapore 2026, Digital Native Track, Ryde  

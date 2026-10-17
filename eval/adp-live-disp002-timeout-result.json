@@ -1,0 +1,104 @@
+{
+  "scope": "Evaluation artifact only. Never load this result as runtime evidence.",
+  "run": {
+    "run_id": "run-fb83c0ba-51f7-4f24-bf5d-6cd34442d364",
+    "case_id": "DISP-002",
+    "provider": "adp",
+    "mode": "live",
+    "status": "failed",
+    "started_at": "2026-10-13T10:49:07.400Z",
+    "completed_at": "2026-10-13T10:50:43.592Z",
+    "error_message": "ADP_TIMEOUT: Review could not be completed. Human review is required; no financial action was taken."
+  },
+  "execution": "One authorized five-call attempt using the organizer DISP-002 sample. No automatic retries.",
+  "checks": {
+    "completedStages": [
+      "rider_brief",
+      "driver_brief",
+      "rider_rebuttal",
+      "driver_rebuttal"
+    ],
+    "failedStage": "judge",
+    "failureCode": "ADP_TIMEOUT",
+    "semanticQuality": "not_assessed"
+  },
+  "context": "User reported Wi-Fi disconnected during the attempt. The timeout code alone does not independently establish its cause.",
+  "events": [
+    {
+      "sequence": 1,
+      "stage": "rider_brief",
+      "status": "started",
+      "role": "rider_advocate",
+      "message": "rider_advocate started rider brief"
+    },
+    {
+      "sequence": 2,
+      "stage": "driver_brief",
+      "status": "started",
+      "role": "driver_advocate",
+      "message": "driver_advocate started driver brief"
+    },
+    {
+      "sequence": 3,
+      "stage": "rider_brief",
+      "status": "completed",
+      "role": "rider_advocate",
+      "message": "rider_advocate completed rider brief"
+    },
+    {
+      "sequence": 4,
+      "stage": "driver_brief",
+      "status": "completed",
+      "role": "driver_advocate",
+      "message": "driver_advocate completed driver brief"
+    },
+    {
+      "sequence": 5,
+      "stage": "rider_rebuttal",
+      "status": "started",
+      "role": "rider_advocate",
+      "message": "rider_advocate started rider rebuttal"
+    },
+    {
+      "sequence": 6,
+      "stage": "rider_rebuttal",
+      "status": "completed",
+      "role": "rider_advocate",
+      "message": "rider_advocate completed rider rebuttal"
+    },
+    {
+      "sequence": 7,
+      "stage": "driver_rebuttal",
+      "status": "started",
+      "role": "driver_advocate",
+      "message": "driver_advocate started driver rebuttal"
+    },
+    {
+      "sequence": 8,
+      "stage": "driver_rebuttal",
+      "status": "completed",
+      "role": "driver_advocate",
+      "message": "driver_advocate completed driver rebuttal"
+    },
+    {
+      "sequence": 9,
+      "stage": "judge",
+      "status": "started",
+      "role": "judge",
+      "message": "judge started judge"
+    },
+    {
+      "sequence": 10,
+      "stage": "judge",
+      "status": "failed",
+      "role": "judge",
+      "message": "judge failed judge"
+    }
+  ],
+  "artifactCount": 0,
+  "decisionCount": 0,
+  "simulatedActionCount": 0,
+  "limitations": [
+    "Completed-stage payloads are not persisted on a failed run; their semantic quality cannot be reviewed from this artifact."
+  ]
+}

@@ -1,0 +1,112 @@
+// Superseded by the user-selected rollback to the 2026-10-15T17:48:59.544Z checkpoint.
+// Preserved for a future projection/precedent experiment; this is not an active test file.
+// These tests used the later enriched projection, not the restored production input contract.
+
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { calculatePolicyWaitSeconds, evaluateReviewFacts, loadReviewFixture, reviewFixtureFromRaw, type NoShowFacts, type RouteFacts, type SurgeFacts } from '../src/policies/ryde-v21.js';
+
+const noShow = (): NoShowFacts => ({
+  category: 'no_show', evidenceIds: ['trip-001'], disputeValueCents: 500, feeCents: 500,
+  scheduledTime: '2026-09-13T08:45:00+08:00', arrivalTime: '2026-09-13T08:43:00+08:00', waitStart: '2026-09-13T08:43:00+08:00', cancellationTime: '2026-09-13T08:51:00+08:00',
+  pickupWaitVerified: true, driverArrived: true, cancellationActor: 'driver', cancellationReason: 'rider_no_show', chatAttempts: 1, callAttempts: 1,
+});
+const surge = (): SurgeFacts => ({ category: 'surge', evidenceIds: ['fare-001'], disputeValueCents: 450, quotedCents: 1200, actualCents: 1650, quoteMultiplier: 1, startMultiplier: 1.5, solelySurgeDifference: true, notificationValid: false, riderProceeded: true });
+const route = (): RouteFacts => ({ category: 'route', evidenceIds: ['trip-001'], disputeValueCents: 344, recommendedDistanceMetres: 20500, actualDistanceMetres: 24800, distanceRateCentsPerKm: 80, trafficJustified: true, notifiedAndAgreed: false });
+const rawNoShow = () => JSON.parse(readFileSync(new URL('../../data/fixtures/disp-002.json', import.meta.url), 'utf8'));
+const rawFixture = (id: string) => JSON.parse(readFileSync(new URL(`../../data/fixtures/${id}.json`, import.meta.url), 'utf8'));
+const factData = (review: ReturnType<typeof reviewFixtureFromRaw>, id: string) => {
+  const fact = review.snapshot.evidence.find(item => item.id === id);
+  if (!fact) throw new Error(`Missing derived fact ${id}`);
+  return fact.data;
+};
+
+describe('mechanical policy comparisons exposed as evidence', () => {
+  it('surfaces no-show numerical conditions separately from location and the final decision', () => {
+    const review = loadReviewFixture('DISP-002');
+    expect(factData(review, 'derived-ryde-v21-wait')).toMatchObject({ policyEligibleWaitSeconds: 360, requiredMinimumWaitSeconds: 300, meetsMinimumWaitDuration: true, policyRuleIds: ['RYDE-V2.1-2.1'] });
+    expect(factData(review, 'derived-ryde-v21-wait').observationLimit).toContain('Sampled locations are not continuous measurement');
+    expect(factData(review, 'derived-ryde-v21-contact')).toMatchObject({ driverChatAttemptsBeforeCancellation: 4, driverInAppCallAttemptsBeforeCancellation: 1, requiredMinimumChatAttempts: 1, requiredMinimumInAppCallAttempts: 1, meetsChatAttemptMinimum: true, meetsInAppCallAttemptMinimum: true, policyRuleIds: ['RYDE-V2.1-2.3'] });
+    expect(factData(review, 'derived-ryde-v21-fee')).toMatchObject({ recordedFeeCents: 500, requiredStandardFeeCents: 500, matchesStandardFee: true, policyRuleIds: ['RYDE-V2.1-2.2'] });
+    expect(factData(review, 'derived-ryde-v21-cancellation')).toMatchObject({ cancellationActor: 'driver', sourceEvidenceIds: ['chat-006'], policyRuleIds: ['RYDE-V2.1-2.2'] });
+  });
+  it.each([['2026-09-13T08:49:59+08:00', 299, false], ['2026-09-13T08:50:00+08:00', 300, true]])('compares the exact minimum at %s without changing other conditions', (cancellationTime, seconds, meetsMinimumWaitDuration) => {
+    const raw = rawNoShow();
+    raw.trip_data.cancellation_time = cancellationTime;
+    expect(factData(reviewFixtureFromRaw(raw), 'derived-ryde-v21-wait')).toMatchObject({ policyEligibleWaitSeconds: seconds, meetsMinimumWaitDuration });
+  });
+  it.each([null, 'invalid timestamp'])('keeps a missing or invalid scheduled wait unknown: %s', scheduledTime => {
+    const raw = rawNoShow();
+    raw.trip_data.scheduled_time = scheduledTime;
+    expect(factData(reviewFixtureFromRaw(raw), 'derived-ryde-v21-wait')).toMatchObject({ policyEligibleWaitSeconds: null, meetsMinimumWaitDuration: null });
+  });
+  it('distinguishes zero recorded attempts from unavailable contact logs', () => {
+    const empty = rawNoShow();
+    empty.chat_logs = [];
+    empty.app_events = [];
+    expect(factData(reviewFixtureFromRaw(empty), 'derived-ryde-v21-contact')).toMatchObject({ driverChatAttemptsBeforeCancellation: 0, driverInAppCallAttemptsBeforeCancellation: 0, meetsChatAttemptMinimum: false, meetsInAppCallAttemptMinimum: false });
+    const missing = rawNoShow();
+    delete missing.chat_logs;
+    delete missing.app_events;
+    expect(factData(reviewFixtureFromRaw(missing), 'derived-ryde-v21-contact')).toMatchObject({ driverChatAttemptsBeforeCancellation: null, driverInAppCallAttemptsBeforeCancellation: null, meetsChatAttemptMinimum: null, meetsInAppCallAttemptMinimum: null });
+  });
+  it('does not turn contact records without a cancellation timestamp into successful minimum checks', () => {
+    const raw = rawNoShow();
+    raw.trip_data.cancellation_time = null;
+    expect(factData(reviewFixtureFromRaw(raw), 'derived-ryde-v21-contact')).toMatchObject({ meetsChatAttemptMinimum: null, meetsInAppCallAttemptMinimum: null });
+  });
+  it('uses the actual actor-identifying record ID rather than a fixture-specific position', () => {
+    const raw = rawNoShow();
+    raw.chat_logs.unshift({ timestamp: '2026-09-13T08:30:00+08:00', sender: 'rider', type: 'message', content: 'Booking confirmed.' });
+    const review = reviewFixtureFromRaw(raw);
+    expect(factData(review, 'derived-ryde-v21-cancellation')).toMatchObject({ cancellationActor: 'driver', sourceEvidenceIds: ['chat-007'] });
+    expect(review.snapshot.evidence.find(item => item.id === 'chat-007')?.data.content).toContain('Trip cancelled by driver');
+  });
+  it('does not infer the cancellation actor from timestamps, a fee or rider-no-show reason alone', () => {
+    const raw = rawNoShow();
+    raw.chat_logs[5].content = 'Trip cancelled. Reason: rider_no_show. Cancellation fee of $5.00 applied.';
+    expect(factData(reviewFixtureFromRaw(raw), 'derived-ryde-v21-cancellation')).toMatchObject({ cancellationActor: null, sourceEvidenceIds: [] });
+  });
+  it.each([[4.99, false], [5, true], [5.01, false], [null, null]])('compares fee %s against the fixed standard without manufacturing an amount', (fee, matchesStandardFee) => {
+    const raw = rawNoShow();
+    raw.trip_data.cancellation_fee = fee;
+    expect(factData(reviewFixtureFromRaw(raw), 'derived-ryde-v21-fee')).toMatchObject({ matchesStandardFee });
+  });
+  it.each([[22.5, false], [22.501, true], [24.8, true], [null, null], [-1, null]])('compares route distance %s against the category limit independently from the general monetary permission', (actualDistance, exceedsAutomaticCategoryDistanceLimit) => {
+    const raw = rawFixture('disp-001');
+    raw.trip_data.actual_distance_km = actualDistance;
+    const review = reviewFixtureFromRaw(raw);
+    expect(factData(review, 'derived-ryde-v21-distance')).toMatchObject({ automaticCategoryDistanceLimitMetres: 2000, exceedsAutomaticCategoryDistanceLimit, policyRuleIds: ['RYDE-V2.1-1.4', 'RYDE-V2.1-6.2'] });
+    expect(factData(review, 'derived-ryde-v21-value')).toMatchObject({ disputeValueCents: 650, belowGeneralMonetaryThreshold: true });
+    expect(factData(review, 'derived-ryde-v21-value').limitation).toContain('Category restrictions');
+  });
+  it.each([[21.99, 999, true], [22, 1000, false], [22.01, 1001, false], [null, null, null]])('preserves the strict under-ten monetary boundary for actual fare %s', (actualFare, disputeValueCents, belowGeneralMonetaryThreshold) => {
+    const raw = rawFixture('disp-003');
+    raw.trip_data.actual_fare = actualFare;
+    expect(factData(reviewFixtureFromRaw(raw), 'derived-ryde-v21-value')).toMatchObject({ disputeValueCents, generalMonetaryThresholdCents: 1000, belowGeneralMonetaryThreshold, policyRuleIds: ['RYDE-V2.1-6.1'] });
+  });
+  it.each(['DISP-001', 'DISP-002', 'DISP-003'])('keeps every exposed comparison traceable to current %s evidence and supplied policy', caseId => {
+    const review = loadReviewFixture(caseId);
+    const evidenceIds = new Set(review.snapshot.evidence.map(item => item.id));
+    const policyIds = new Set(review.snapshot.policyRules.map(item => item.id));
+    const comparisons = review.snapshot.evidence.filter(item => item.kind === 'derived_fact' && Array.isArray(item.data.policyRuleIds));
+    expect(comparisons.length).toBeGreaterThan(0);
+    for (const comparison of comparisons) {
+      expect(comparison.data.measurement).toEqual(expect.any(String));
+      expect(comparison.data.epistemicStatus).toEqual(expect.any(String));
+      expect((comparison.data.sourceEvidenceIds as string[]).every(id => evidenceIds.has(id))).toBe(true);
+      expect((comparison.data.policyRuleIds as string[]).every(id => policyIds.has(id))).toBe(true);
+    }
+  });
+  it.each(['disp-001', 'disp-002', 'disp-003'])('derives comparisons without reading altered expected answers for %s', caseId => {
+    const raw = rawFixture(caseId);
+    const original = reviewFixtureFromRaw(raw).snapshot;
+    raw.expected_ruling = 'reverse_everything';
+    raw.expected_refund_amount = 99999;
+    raw.case_metadata = { ...raw.case_metadata, expected_ruling: 'reverse_everything', expected_refund_amount: 99999 };
+    raw.recommended_ruling = { ruling: 'reverse_everything', refund_amount: 99999 };
+    const snapshot = reviewFixtureFromRaw(raw).snapshot;
+    expect(snapshot).toEqual(original);
+    expect(JSON.stringify(snapshot)).not.toMatch(/"outcome"|"adjustmentCents"|"reasonCodes"|reverse_everything|expected_ruling|expected_refund_amount|recommended_ruling/);
+  });
+});

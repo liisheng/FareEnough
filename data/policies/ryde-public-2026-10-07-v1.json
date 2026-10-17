@@ -1,0 +1,24 @@
+{
+  "profile_id": "ryde-public-2026-10-07-v1",
+  "version": "1.0.0",
+  "retrieved_at": "2026-10-07",
+  "automatic_scope": ["synthetic RydeX on-demand fixtures with complete evidence"],
+  "unsupported_services": ["RydeTAXI", "carpool", "RydeSEND", "multi-stop arithmetic"],
+  "rules": [
+    {"id":"PUB-NS-01","namespace":"official_rule","statement":"On-demand rider cancellations within three minutes of matching are not chargeable under the general policy.","source_ids":["SRC-NS-01","SRC-NS-05"],"parameters":{"matching_grace_seconds":180}},
+    {"id":"PUB-NS-02","namespace":"official_rule","statement":"The published rider no-show amount is 661 cents and the waiting condition is strictly more than 180 seconds after I'm Here at pickup.","source_ids":["SRC-NS-01"],"parameters":{"amount_minor":661,"wait_seconds":180,"comparison":"strictly_greater_than"}},
+    {"id":"PUB-WAIT-01","namespace":"official_rule","statement":"The published completed-trip waiting charge is 500 cents after more than 180 seconds.","source_ids":["SRC-NS-01","SRC-NS-07"],"parameters":{"amount_minor":500,"wait_seconds":180,"comparison":"strictly_greater_than"}},
+    {"id":"PUB-LOC-01","namespace":"official_rule","statement":"GPS must support arrival at the pickup location; no public numerical tolerance is asserted.","source_ids":["SRC-NS-03"],"parameters":{"public_geofence_meters":"unknown"}},
+    {"id":"PUB-CONTACT-01","namespace":"official_rule","statement":"No-show guidance instructs attempting in-app chat or call without a published minimum count or duration.","source_ids":["SRC-NS-04"],"parameters":{"minimum_attempts":"not_published"}},
+    {"id":"PUB-WAIVE-01","namespace":"official_rule","statement":"Eligible cancellation-waiver requests have a 30-day window and use a 661-cent wallet voucher remedy.","source_ids":["SRC-NS-06"],"parameters":{"window_days":30,"voucher_minor":661}},
+    {"id":"PUB-ROUTE-01","namespace":"official_rule","statement":"General quoted fares are fixed except RydeTAXI; route preference should be agreed and longer distance alone does not establish overcharge.","source_ids":["SRC-RT-01","SRC-RT-02","SRC-RT-03"],"parameters":{"distance_refund_formula":false}},
+    {"id":"PUB-ERP-01","namespace":"official_rule","statement":"RydeX ERP is additional and should correspond to actual gantries passed.","source_ids":["SRC-RT-04","SRC-RT-05"],"parameters":{"requires_actual_gantry":true}},
+    {"id":"PUB-DEST-01","namespace":"official_rule","statement":"Accepted in-app destination changes can change fare and incur a separate 300-cent add/edit fee.","source_ids":["SRC-RT-06","SRC-RT-07","SRC-RT-08"],"parameters":{"edit_fee_minor":300}}
+  ],
+  "limitations": [
+    "Advanced-trip cases with an unresolved early-arrival clock require human review.",
+    "The driver payout and rider charge are different quantities.",
+    "Conflicting public waiting-fee descriptions are not silently reconciled.",
+    "Public rules are isolated from organizer and demo interpretations."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "caseId": "DISP-003",
+  "currency": "SGD",
+  "expectedPolicyProfile": "ryde-v2.1",
+  "expectedOutcome": "reverse_fee",
+  "expectedDisposition": "claim_upheld",
+  "expectedFeeTreatment": "surge_differential_refunded",
+  "expectedAction": "refund",
+  "expectedAmountMinor": 450,
+  "calculatedReferenceFacts": {
+    "quotedFareMinor": 1200,
+    "actualFareMinor": 1650,
+    "surgeDifferentialMinor": 450,
+    "quotedSurgeMultiplier": 1,
+    "actualSurgeMultiplier": 1.5,
+    "riderNotified": false
+  },
+  "referenceSource": "docs/resources/Document 1 — Fare Dispute Sample Data (JSON).md",
+  "expectationBasis": "Derived from the supplied fare and notification logs and Policy v2.1 Sections 3.1–3.4: the unnotified surge increase accounts for the S$4.50 fare difference. The source file contains no explicit expected_ruling field.",
+  "note": "Evaluation-only expectations derived from the supplied sample and policy. Never imported by runtime/agent code."
+}

@@ -1,0 +1,215 @@
+{
+  "sourceReport": "ryde-v21-2026-10-16T00-08-25.394Z.json",
+  "sourceReportSha256": "sha256:d966846b191ddda00a33437194db73bd20ace0c0b7e7b4574c01d5654e6e922d",
+  "sourceReportCompletedAt": "2026-10-16T00:10:22.179Z",
+  "acceptanceContract": "../all-stage-acceptance.md",
+  "scope": "Read-only semantic audit of all 15 required stage slots, including the rejected no-show Rider rebuttal and explicit missing-stage failures. The raw report is unchanged.",
+  "cases": {
+    "DISP-002": {
+      "stages": {
+        "rider_brief": {
+          "status": "failed",
+          "summary": "Uses the new wait, contact, actor and monetary facts correctly, but demands review without a supporting review trigger and leaves its asserted concern unresolved.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "position says 'Human review is required.' while claims establish the 360-second interval, both contact attempts, standard fee and automatic-determination permissions. No cited restriction or decisive missing fact explains that conclusion; unansweredQuestions is empty. The supplied sampled-evidence interpretation supports retention."
+            },
+            {
+              "severity": "material",
+              "text": "adverseEvidence[0] states the vehicle was stationary 'from 08:43 to 08:51' without limiting that assertion to the four recorded samples; claims[6] acknowledges that these samples do not establish continuous presence. This is internally inconsistent location framing."
+            }
+          ]
+        },
+        "driver_brief": {
+          "status": "failed",
+          "summary": "The retention conclusion, 360-second calculation and contact conditions are supported, and the actor citation is improved, but the location claim overstates sampled observations.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "claims[0] says the vehicle 'remained at that location through the scheduled pickup ... until cancellation'. The cited GPS fixes are observations at 08:43, 08:45, 08:48 and 08:51, not uninterrupted measurement. Mentioning samples at the end does not clearly qualify the asserted continuous presence as required by the contract."
+            },
+            {
+              "severity": "minor",
+              "text": "claims[3] combines a supported driver-cancellation attribution and fee with 'after the free wait period', but cites only derived-cancellation and derived-fee. The timing clause should also cite derived-wait, which is cited correctly in claims[1]."
+            },
+            {
+              "severity": "minor",
+              "text": "adverseEvidence[0] loosely calls inability to find the vehicle a contradiction of driver presence. The original rider submission also alleges the driver never showed, which is the contradictory allegation; the inability-to-find observation alone can coexist with the GPS observations. The concession about reversal if the rider's full account were verified is conditional, not proof that their account is established."
+            }
+          ]
+        },
+        "rider_rebuttal": {
+          "status": "failed",
+          "summary": "A response exists only under unvalidatedProviderResponses; it failed schema validation and also introduces an unsupported materiality argument.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "unvalidatedProviderResponses.rider_rebuttal.claims[2] is a standalone glossary summary with evidenceIds: []. This violates the required cited-claim schema; the coordinator correctly rejected it with INVALID_AGENT_SCHEMA."
+            },
+            {
+              "severity": "material",
+              "text": "response calls unverified rider presence a material gap without identifying affirmative contrary location evidence or a supplied verification prerequisite. It acknowledges that the glossary prescribes no independent rider GPS verification, yet uses the absence of verification to undermine the established conditions instead of distinguishing the rider's account from corroborated vehicle observations."
+            },
+            {
+              "severity": "minor",
+              "text": "The rebuttal retains its own two concessions, but the second should explicitly describe GPS corroboration at sampled times instead of repeating the earlier broad 'during the wait period' wording."
+            }
+          ]
+        },
+        "driver_rebuttal": {
+          "status": "failed",
+          "summary": "Not produced: the no-show run stopped when the Rider rebuttal failed schema validation.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No artifact or unvalidated provider response exists for driver_rebuttal. A missing stage cannot pass an all-stage acceptance run; this is an execution omission, not a semantic claim about an unseen response."
+            }
+          ]
+        },
+        "judge": {
+          "status": "failed",
+          "summary": "Not produced: the no-show run stopped before Judge execution.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No Judge artifact or unvalidated provider response exists. The expected retention decision, evidence coverage and required distinction from the contact-failure precedent cannot be assessed."
+            }
+          ]
+        }
+      }
+    },
+    "DISP-003": {
+      "stages": {
+        "rider_brief": {
+          "status": "failed",
+          "summary": "The 450-cent refund position and its supporting facts are correct, but the decisive refund-rule citation required by the contract is missing.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "position asserts refund entitlement, while claims cite quote binding (3.1), notification (3.2), calculation (3.4) and monetary permission (6.1), but never apply/cite RYDE-V2.1-3.3, which establishes the refund consequence. This is a material citation-contract omission of the decisive rule despite a supported outcome, not a stylistic objection; add one case-specific application rather than a policy-only summary."
+            },
+            {
+              "severity": "minor",
+              "text": "The sole concession describes the rider discovering the increase after the trip. This supports the rider rather than conceding a valid opposing point. The completed service could be acknowledged without suggesting it waives notification or reduces the supported differential."
+            }
+          ]
+        },
+        "driver_brief": {
+          "status": "failed",
+          "summary": "Rejects a supported surge-differential refund by treating completed travel as a substitute for the mandatory notification condition.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "position says the higher fare is valid because the rider proceeded. Section 3.3 permits the higher fare only when the rider was properly notified AND proceeds. adverseEvidence[1] and concessions explicitly acknowledge the platform did not notify the rider, so the conclusion contradicts both evidence and policy."
+            },
+            {
+              "severity": "material",
+              "text": "The claims establish the sole-surge difference and completed trip but omit the decisive current application of 3.3. Neither a low dispute value nor the absence of a review trigger overrides the unnotified-surge refund condition."
+            }
+          ]
+        },
+        "rider_rebuttal": {
+          "status": "failed",
+          "summary": "Correctly challenges the Driver's notification-waiver argument and supports the 450-cent differential, but includes a forbidden policy-only entry.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "claims[2] merely states what RYDE-V2.1-3.3 says, with surge-001 attached, rather than asserting the case fact and applying the rule. Surrounding claims establish the notification status and amount, so the reasoning is sound, but this fails the explicit citation contract prohibiting policy-only entries. The material contract failure is not a stylistic preference or a claim that the proposed remedy is wrong. Replace it with a case-specific consequence."
+            },
+            {
+              "severity": "minor",
+              "text": "preservedConcessions faithfully retains its own original statement, although that statement supports the rider rather than constituting an opposing concession."
+            }
+          ]
+        },
+        "driver_rebuttal": {
+          "status": "failed",
+          "summary": "Doubles down on an invented exception allowing an undisclosed surge increase whenever the rider completes the trip.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "response and claims[3] quote the notification/proceeding alternatives and then explicitly conclude that proceeding validates the higher fare regardless of notification. This reverses the AND condition in 3.3 and contradicts the preserved notification-failure concession."
+            },
+            {
+              "severity": "material",
+              "text": "response dismisses the relevant historical notification precedent by treating completed travel as overriding it. The supplied 7.2 precedent concerns a completed trip with an unnotified surge differential and supports applying the same refund principle to the current verified 450 cents."
+            }
+          ]
+        },
+        "judge": {
+          "status": "failed",
+          "summary": "Correctly proposes reverse_fee for 450 cents with grounded amount, notification and threshold citations, but fails the required precedent comparison.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "No finding, explanation or policy citation compares RYDE-V2.1-7.2 to the present unnotified, sole-surge increase, although it is supplied and section 7/this acceptance contract requires that comparison. The machine supportingCitation_relevant_precedent check also fails. This is a missing required rationale component; the actual outcome and amount are supported."
+            }
+          ]
+        }
+      }
+    },
+    "DISP-001": {
+      "stages": {
+        "rider_brief": {
+          "status": "passed",
+          "summary": "Correctly requires review from the outset using the 4.3 km / 2 km comparison, leaves the remedy unresolved and fairly acknowledges traffic justification.",
+          "issues": [
+            {
+              "severity": "minor",
+              "text": "adverseEvidence[1] describes a 'continuous route' from GPS samples. The intended road sequence is supported, but 'recorded route points via Geylang and ECP' would avoid implying continuous measurement. Unlike the no-show presence claim, this wording does not establish an uninterrupted-location condition or affect the decision path."
+            }
+          ]
+        },
+        "driver_brief": {
+          "status": "passed",
+          "summary": "Correctly requires review, cites the distance restriction, acknowledges the rider's report and concedes that the cited chat gives no route-change reason.",
+          "issues": [
+            {
+              "severity": "minor",
+              "text": "claims[3] labels PIE the recommended route while citing only traffic-001. That source establishes the fire/congestion on PIE; the route description is additional context. Keep the claim to the recorded traffic location, or cite an appropriate route source when making the stronger designation."
+            }
+          ]
+        },
+        "rider_rebuttal": {
+          "status": "passed",
+          "summary": "Agrees with the strongest supported restriction, cites the current distance and section 6.2, retains its valid concessions and does not award a remedy.",
+          "issues": [
+            {
+              "severity": "minor",
+              "text": "response refers briefly to 'lack of notification'. Its original brief limits the recorded absence to chat and attributes the broader claim to the rider. Retain that scope when discussing merits; neither lack of a chat reason nor the distance calculation proves that no permitted verbal notice occurred."
+            }
+          ]
+        },
+        "driver_rebuttal": {
+          "status": "passed",
+          "summary": "Accepts the insufficiency of the cited chat response, preserves its own concession and correctly keeps the mandatory distance restriction decisive.",
+          "issues": [
+            {
+              "severity": "minor",
+              "text": "response agrees that the driver's chat lacked a route-change reason, but its own claims omit chat-005/chat-006; those records support the challenged claim in the supplied opposing brief. Include chat-006 in a case-specific notification claim for direct citation coverage."
+            },
+            {
+              "severity": "minor",
+              "text": "claims[2] repeats 'continuous route' for sampled GPS points. The sampled route sequence and smooth ECP traffic are supported, but continuous measurement is not."
+            }
+          ]
+        },
+        "judge": {
+          "status": "failed",
+          "summary": "Correctly proposes human_review with zero adjustment from the known distance restriction, but omits the required precedent distinction and adds uncited explanation facts.",
+          "issues": [
+            {
+              "severity": "material",
+              "text": "The Judge never compares current 4.3 km with the 1.8 km historical route case in RYDE-V2.1-7.1. The supplied precedent must be distinguished because its partial refund does not override the current section 6.2 restriction; the required machine precedent check also fails."
+            },
+            {
+              "severity": "minor",
+              "text": "explanation additionally asserts no safety allegation and a below-threshold dispute value. Its only findings/citations concern distance. Either omit these nondecisive assertions or add supporting case findings with derived-value and the relevant incident records/policy rules."
+            }
+          ]
+        }
+      }
+    }
+  }
+}

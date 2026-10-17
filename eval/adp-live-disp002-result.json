@@ -1,0 +1,460 @@
+{
+  "scope": "Evaluation artifact only. Never load this result or its assessment as runtime evidence.",
+  "run": {
+    "run_id": "run-baf67594-e968-4695-9568-bcfb886ad74a",
+    "case_id": "DISP-002",
+    "provider": "tencent-adp-v2",
+    "mode": "live",
+    "status": "completed",
+    "started_at": "2026-10-13T10:12:36.465Z",
+    "completed_at": "2026-10-13T10:13:22.016Z"
+  },
+  "execution": "One authorized live ADP run, five calls; no retries. User approved transfer of DISP-002 sample trip, location and chat data.",
+  "checks": {
+    "transport": "pass",
+    "fiveStages": "pass",
+    "schemaAndCitationIds": "pass",
+    "auditPersistence": "pass",
+    "policyThresholdValidation": "pass",
+    "semanticQuality": "fail"
+  },
+  "qualityFindings": [
+    "Rider brief requests reversal while its own position describes the policy conditions as met.",
+    "Rider rebuttal presents reported rider presence as verified without supporting verification.",
+    "Driver rebuttal labels reported accounts contradictory where co-presence is not ruled out."
+  ],
+  "limitations": [
+    "Schema and identifier checks do not establish that cited evidence supports the wording of every claim.",
+    "No real financial action occurred.",
+    "Do not present this as a full semantic-quality pass."
+  ],
+  "artifacts": [
+    {
+      "stage": "driver_brief",
+      "actor": "driver_advocate",
+      "payload": {
+        "role": "driver_advocate",
+        "position": "The driver's actions and the elapsed time align with the no-show policy, supporting the application of the cancellation fee. The driver arrived at the designated pickup location, initiated the wait period, made contact attempts, and waited for the required duration before cancelling.",
+        "claims": [
+          {
+            "text": "The driver arrived at the designated pickup point (Tiong Bahru Plaza) at 08:43, two minutes before the scheduled pickup time, as verified by GPS and app events.",
+            "evidenceIds": [
+              "gps-005",
+              "evt-004"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The driver reported arrival at the lobby area and provided vehicle details via in-app chat immediately upon arrival, initiating contact with the rider.",
+            "evidenceIds": [
+              "chat-001",
+              "chat-002"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The driver attempted to contact the rider via an in-app call at 08:47:05, which rang for 22 seconds and was not answered.",
+            "evidenceIds": [
+              "chat-003",
+              "evt-007"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The driver remained stationary at the verified pickup coordinates from 08:43 until the trip was cancelled at 08:51, resulting in a total elapsed waiting duration of 480 seconds.",
+            "evidenceIds": [
+              "gps-005",
+              "gps-006",
+              "gps-007",
+              "gps-008",
+              "derived_wait_duration"
+            ],
+            "policyRuleIds": [
+              "ORG-NS-03",
+              "ORG-NS-04",
+              "ORG-NS-05"
+            ]
+          },
+          {
+            "text": "The elapsed waiting duration of 480 seconds meets the numerical no-show threshold of 480 seconds specified in the applicable policy.",
+            "evidenceIds": [
+              "derived_wait_duration"
+            ],
+            "policyRuleIds": [
+              "ORG-NS-03",
+              "ORG-NS-05"
+            ]
+          }
+        ],
+        "adverseEvidence": [
+          {
+            "text": "The rider reports they were at the pickup point on time and waited 10 minutes at the lobby but could not find the driver's car.",
+            "evidenceIds": [
+              "dispute-001"
+            ],
+            "policyRuleIds": []
+          }
+        ],
+        "concessions": [
+          "The rider's reported account, if verified, would contradict the driver's position that they were present and visible at the designated lobby area."
+        ],
+        "unansweredQuestions": [
+          "Was the driver's vehicle physically located at the specific, correct 'lobby area' as described to the rider, or was there a mismatch in the precise meeting point?",
+          "Is there any independent verification (e.g., rider location data, CCTV) to corroborate either party's physical presence at the exact agreed pickup spot during the wait period?"
+        ]
+      }
+    },
+    {
+      "stage": "driver_rebuttal",
+      "actor": "driver_advocate",
+      "payload": {
+        "role": "driver_advocate",
+        "response": "The rider's claim that they were at the correct pickup point is unverified and contradicted by the driver's documented location and attempts to connect.",
+        "challengedClaim": "The rider disputes being a 'no-show,' stating they were at the pickup point at Tiong Bahru Plaza on time but the driver never showed up.",
+        "claims": [
+          {
+            "text": "The driver reported arriving at and waiting at the 'lobby area' of Tiong Bahru Plaza, providing specific vehicle details via in-app messages.",
+            "evidenceIds": [
+              "chat-001",
+              "chat-002"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "GPS data verifies the driver's vehicle was stationary at the designated pickup coordinates from 08:43 to 08:51.",
+            "evidenceIds": [
+              "gps-005",
+              "gps-006",
+              "gps-007",
+              "gps-008"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The driver attempted to contact the rider via an in-app call and multiple messages after arrival, but received no response.",
+            "evidenceIds": [
+              "chat-003",
+              "chat-004",
+              "chat-005",
+              "evt-007"
+            ],
+            "policyRuleIds": []
+          }
+        ],
+        "preservedConcessions": [
+          "There is no verified evidence, such as rider GPS or check-in, to corroborate the rider's claim of being at the lobby."
+        ]
+      }
+    },
+    {
+      "stage": "judge",
+      "actor": "judge",
+      "payload": {
+        "outcome": "uphold_fee",
+        "explanation": "The supplied evidence and applicable policy establish the conditions for retaining the existing $5.00 cancellation fee. The driver arrived at the designated pickup location, initiated the free wait period, and remained stationary for the verified elapsed interval of 480 seconds, meeting the no-show threshold. The driver made multiple contact attempts which went unanswered. The rider's reported presence is not verified by supplied evidence, and no evidence contradicts the driver's location or the elapsed time. Therefore, the policy conditions for the fee are satisfied.",
+        "findings": [
+          {
+            "text": "The driver arrived at the designated pickup location at 08:43, as verified by GPS and system arrival events.",
+            "evidenceIds": [
+              "gps-005",
+              "evt-004"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The driver's vehicle remained stationary at the pickup coordinates from 08:43 until cancellation at 08:51, resulting in a verified elapsed interval of 480 seconds.",
+            "evidenceIds": [
+              "gps-005",
+              "gps-008",
+              "derived_wait_duration"
+            ],
+            "policyRuleIds": [
+              "ORG-NS-03",
+              "ORG-NS-04",
+              "ORG-NS-05"
+            ]
+          },
+          {
+            "text": "The verified elapsed interval of 480 seconds meets the numerical no-show threshold of 480 seconds specified in policy rule ORG-NS-05.",
+            "evidenceIds": [
+              "derived_wait_duration"
+            ],
+            "policyRuleIds": [
+              "ORG-NS-03",
+              "ORG-NS-05"
+            ]
+          },
+          {
+            "text": "The driver sent arrival notifications and attempted to contact the rider via in-app messages and an unanswered call.",
+            "evidenceIds": [
+              "evt-005",
+              "chat-001",
+              "chat-002",
+              "evt-007",
+              "chat-003"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The rider reports being at the pickup lobby but could not find the car; however, no supplied evidence verifies the rider's physical presence at the designated pickup point.",
+            "evidenceIds": [
+              "dispute-001"
+            ],
+            "policyRuleIds": []
+          }
+        ],
+        "evidenceIds": [
+          "gps-005",
+          "evt-004",
+          "gps-008",
+          "derived_wait_duration",
+          "evt-005",
+          "chat-001",
+          "chat-002",
+          "evt-007",
+          "chat-003",
+          "dispute-001"
+        ],
+        "policyRuleIds": [
+          "ORG-NS-03",
+          "ORG-NS-04",
+          "ORG-NS-05"
+        ],
+        "proposedAdjustmentCents": 0,
+        "uncertainty": []
+      }
+    },
+    {
+      "stage": "rider_brief",
+      "actor": "rider_advocate",
+      "payload": {
+        "role": "rider_advocate",
+        "position": "The $5.00 cancellation fee should be reversed. The rider disputes being a 'no-show,' but the system evidence confirms the driver arrived, waited the required period, and the rider did not board or respond to contact attempts. The fee was applied per policy after the no-show threshold was met.",
+        "claims": [
+          {
+            "text": "The driver arrived at the pickup location at 08:43, as confirmed by GPS and system arrival events.",
+            "evidenceIds": [
+              "gps-005",
+              "evt-004"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The driver waited at the pickup location for 8 minutes, from 08:43 to 08:51, meeting the 480-second no-show threshold.",
+            "evidenceIds": [
+              "gps-005",
+              "gps-008",
+              "derived_wait_duration"
+            ],
+            "policyRuleIds": [
+              "ORG-NS-03",
+              "ORG-NS-05"
+            ]
+          },
+          {
+            "text": "The driver sent arrival notifications and attempted to contact the rider via in-app messages and a call, which went unanswered.",
+            "evidenceIds": [
+              "evt-005",
+              "chat-001",
+              "chat-002",
+              "evt-007",
+              "chat-003"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The system applied a $5.00 cancellation fee after the 8-minute wait period elapsed without the rider boarding.",
+            "evidenceIds": [
+              "evt-009",
+              "trip-001"
+            ],
+            "policyRuleIds": [
+              "ORG-NS-01"
+            ]
+          }
+        ],
+        "adverseEvidence": [
+          {
+            "text": "The rider's account states they were at the pickup point on time and waited 10 minutes, but no evidence verifies their presence at the lobby.",
+            "evidenceIds": [
+              "dispute-001"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The driver's GPS remained stationary at the pickup coordinates from 08:43 to 08:51, indicating they were present and waiting.",
+            "evidenceIds": [
+              "gps-005",
+              "gps-006",
+              "gps-007",
+              "gps-008"
+            ],
+            "policyRuleIds": []
+          }
+        ],
+        "concessions": [
+          "The driver's actions and the system timeline appear consistent with policy for applying a no-show fee.",
+          "There is no verified evidence, such as rider GPS or check-in, to corroborate the rider's claim of being at the lobby."
+        ],
+        "unansweredQuestions": [
+          "Where exactly was the rider located relative to the driver's specified lobby area? The pickup location 'Tiong Bahru Plaza' is a large venue.",
+          "Did the rider attempt to contact the driver via the app or call to clarify their location?",
+          "Were there any app issues or notification failures that could have prevented the rider from seeing the driver's messages or arrival alert?"
+        ]
+      }
+    },
+    {
+      "stage": "rider_rebuttal",
+      "actor": "rider_advocate",
+      "payload": {
+        "role": "rider_advocate",
+        "response": "The driver's claim of being at the correct lobby area is contradicted by the rider's verified presence at the pickup location and the lack of evidence that the driver was at the specific, correct meeting point described to the rider.",
+        "challengedClaim": "The driver reported arrival at the lobby area and provided vehicle details via in-app chat immediately upon arrival, initiating contact with the rider.",
+        "claims": [
+          {
+            "text": "The driver's GPS location was stationary at the pickup coordinates from 08:43 to 08:51, but this does not verify the driver was at the specific 'lobby area' as described in chat messages.",
+            "evidenceIds": [
+              "gps-005",
+              "gps-006",
+              "gps-007",
+              "gps-008"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The rider's dispute states they were at the pickup point at Tiong Bahru Plaza on time and waited 10 minutes at the lobby but could not find the car, indicating a potential mismatch in the precise meeting point despite both parties being in the general area.",
+            "evidenceIds": [
+              "dispute-001"
+            ],
+            "policyRuleIds": []
+          }
+        ],
+        "preservedConcessions": [
+          "The rider's reported account, if verified, would contradict the driver's position that they were present and visible at the designated lobby area."
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "sequence": 1,
+      "event_type": "rider_brief_started",
+      "payload": {
+        "sequence": 1,
+        "stage": "rider_brief",
+        "status": "started",
+        "role": "rider_advocate",
+        "message": "rider_advocate started rider brief"
+      }
+    },
+    {
+      "sequence": 2,
+      "event_type": "driver_brief_started",
+      "payload": {
+        "sequence": 2,
+        "stage": "driver_brief",
+        "status": "started",
+        "role": "driver_advocate",
+        "message": "driver_advocate started driver brief"
+      }
+    },
+    {
+      "sequence": 3,
+      "event_type": "driver_brief_completed",
+      "payload": {
+        "sequence": 3,
+        "stage": "driver_brief",
+        "status": "completed",
+        "role": "driver_advocate",
+        "message": "driver_advocate completed driver brief"
+      }
+    },
+    {
+      "sequence": 4,
+      "event_type": "rider_brief_completed",
+      "payload": {
+        "sequence": 4,
+        "stage": "rider_brief",
+        "status": "completed",
+        "role": "rider_advocate",
+        "message": "rider_advocate completed rider brief"
+      }
+    },
+    {
+      "sequence": 5,
+      "event_type": "rider_rebuttal_started",
+      "payload": {
+        "sequence": 5,
+        "stage": "rider_rebuttal",
+        "status": "started",
+        "role": "rider_advocate",
+        "message": "rider_advocate started rider rebuttal"
+      }
+    },
+    {
+      "sequence": 6,
+      "event_type": "rider_rebuttal_completed",
+      "payload": {
+        "sequence": 6,
+        "stage": "rider_rebuttal",
+        "status": "completed",
+        "role": "rider_advocate",
+        "message": "rider_advocate completed rider rebuttal"
+      }
+    },
+    {
+      "sequence": 7,
+      "event_type": "driver_rebuttal_started",
+      "payload": {
+        "sequence": 7,
+        "stage": "driver_rebuttal",
+        "status": "started",
+        "role": "driver_advocate",
+        "message": "driver_advocate started driver rebuttal"
+      }
+    },
+    {
+      "sequence": 8,
+      "event_type": "driver_rebuttal_completed",
+      "payload": {
+        "sequence": 8,
+        "stage": "driver_rebuttal",
+        "status": "completed",
+        "role": "driver_advocate",
+        "message": "driver_advocate completed driver rebuttal"
+      }
+    },
+    {
+      "sequence": 9,
+      "event_type": "judge_started",
+      "payload": {
+        "sequence": 9,
+        "stage": "judge",
+        "status": "started",
+        "role": "judge",
+        "message": "judge started judge"
+      }
+    },
+    {
+      "sequence": 10,
+      "event_type": "judge_completed",
+      "payload": {
+        "sequence": 10,
+        "stage": "judge",
+        "status": "completed",
+        "role": "judge",
+        "message": "judge completed judge"
+      }
+    }
+  ],
+  "decision": {
+    "validation_status": "validated",
+    "disposition": "claim_rejected",
+    "action": "uphold_fee",
+    "amount_minor": 0,
+    "currency": "SGD",
+    "evidence_citations": "[\"gps-005\",\"evt-004\",\"gps-008\",\"derived_wait_duration\",\"evt-005\",\"chat-001\",\"chat-002\",\"evt-007\",\"chat-003\",\"dispute-001\"]",
+    "policy_citations": "[\"ORG-NS-03\",\"ORG-NS-04\",\"ORG-NS-05\"]",
+    "reason_codes": "[\"DETERMINISTIC_POLICY_MATCH\"]"
+  }
+}

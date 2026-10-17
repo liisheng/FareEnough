@@ -1,0 +1,61 @@
+{
+  "profile_id": "organizer-disp002-v1",
+  "version": "1.0.0",
+  "source_register": "SRC-D1",
+  "retrieval_date": "2026-10-07",
+  "applicable_services": ["ride-hailing"],
+  "currency": "SGD",
+  "rules": [
+    {
+      "rule_id": "ORG-NS-01",
+      "namespace": "organizer_rule",
+      "description": "Recorded cancellation charge is 500 cents (S$5.00)",
+      "value_minor": 500,
+      "source_ids": ["SRC-D1"]
+    },
+    {
+      "rule_id": "ORG-NS-02",
+      "namespace": "organizer_rule",
+      "description": "Free wait period is 300 seconds (5 minutes)",
+      "value_seconds": 300,
+      "source_ids": ["SRC-D1"]
+    },
+    {
+      "rule_id": "ORG-NS-03",
+      "namespace": "organizer_rule",
+      "description": "No-show threshold is 480 seconds total wait (8 minutes)",
+      "value_seconds": 480,
+      "source_ids": ["SRC-D1"]
+    },
+    {
+      "rule_id": "ORG-NS-04",
+      "namespace": "demo_interpretation",
+      "description": "Wait anchor is corroborated driver_wait_start, matching arrival at 08:43:00. Not generalized Ryde policy.",
+      "source_ids": ["SRC-D1"]
+    },
+    {
+      "rule_id": "ORG-NS-05",
+      "namespace": "demo_interpretation",
+      "description": "Free-wait expiry = anchor + 300 seconds. Eligible comparison: elapsedSeconds >= 480.",
+      "source_ids": ["SRC-D1"]
+    },
+    {
+      "rule_id": "ORG-NS-06",
+      "namespace": "demo_interpretation",
+      "description": "Free wait and no-show threshold are not added to make 780 seconds. Passing 300 seconds alone does not authorize a no-show cancellation under this profile.",
+      "source_ids": ["SRC-D1"]
+    },
+    {
+      "rule_id": "ORG-FIN-01",
+      "namespace": "demo_interpretation",
+      "description": "Financial treatment when fee valid: keep existing fee; no additional debit or driver payout.",
+      "source_ids": ["SRC-D1"]
+    },
+    {
+      "rule_id": "ORG-FIN-02",
+      "namespace": "demo_interpretation",
+      "description": "Financial treatment when conclusively invalid: simulated refund of recorded disputed charge, capped at that charge (500 cents).",
+      "source_ids": ["SRC-D1"]
+    }
+  ]
+}

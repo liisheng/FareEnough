@@ -1,0 +1,63 @@
+{
+  "scope": "Reviewed evaluation acceptance only. No model calls or financial actions; raw reports remain unchanged.",
+  "sourceReport": "ryde-v21-2026-10-16T00-08-25.394Z.json",
+  "sourceReportSha256": "sha256:d966846b191ddda00a33437194db73bd20ace0c0b7e7b4574c01d5654e6e922d",
+  "sourceReview": "ryde-v21-2026-10-16T00-08-25.394Z-semantic-review.json",
+  "sourceReviewSha256": "sha256:79fdc81b282d3431ee9da034aac26d506a460ce7a54c0d85b3607ed39e0e4364",
+  "createdAt": "2026-10-16T00:25:50.740Z",
+  "status": "failed",
+  "cases": [
+    {
+      "caseId": "DISP-002",
+      "status": "failed",
+      "finalDecisionChecksPassed": false,
+      "stageContractChecksPassed": false,
+      "semanticReviewPassed": false,
+      "failedStageContracts": [
+        "rider_rebuttal",
+        "driver_rebuttal",
+        "judge"
+      ],
+      "failedSemanticStages": [
+        "rider_brief",
+        "driver_brief",
+        "rider_rebuttal",
+        "driver_rebuttal",
+        "judge"
+      ],
+      "pendingSemanticStages": []
+    },
+    {
+      "caseId": "DISP-003",
+      "status": "failed",
+      "finalDecisionChecksPassed": false,
+      "stageContractChecksPassed": false,
+      "semanticReviewPassed": false,
+      "failedStageContracts": [
+        "judge"
+      ],
+      "failedSemanticStages": [
+        "rider_brief",
+        "driver_brief",
+        "rider_rebuttal",
+        "driver_rebuttal",
+        "judge"
+      ],
+      "pendingSemanticStages": []
+    },
+    {
+      "caseId": "DISP-001",
+      "status": "failed",
+      "finalDecisionChecksPassed": false,
+      "stageContractChecksPassed": false,
+      "semanticReviewPassed": false,
+      "failedStageContracts": [
+        "judge"
+      ],
+      "failedSemanticStages": [
+        "judge"
+      ],
+      "pendingSemanticStages": []
+    }
+  ]
+}

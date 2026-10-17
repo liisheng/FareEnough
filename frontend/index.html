@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ed3466"><title>FareEnough | Dispute workspace</title><link rel="stylesheet" href="styles/styles.css"><link rel="stylesheet" href="styles/demo.css"><link rel="stylesheet" href="styles/progress.css"><link rel="stylesheet" href="styles/experience.css"><script src="vendor/motion.js" defer></script><script src="scripts/app.js" defer></script><script src="scripts/participation.js" defer></script><script src="scripts/experience.js" defer></script></head>
+<body>
+<a class="skip" href="#main">Skip to workspace</a>
+<header class="header"><a class="brand" href="#rider">fare<span>enough</span><b>.</b></a><nav aria-label="Workspace"><a href="#rider" id="rider-link">Rider</a><a href="#driver" id="driver-link">Driver</a><a href="#support" id="support-link">Review workspace</a><a href="#admin" id="admin-link">Admin decisions</a></nav><span class="local">FARE REVIEW</span></header>
+<div class="demo-bar"><span><strong>Connected dispute workspace</strong></span><span><span id="connection-status" role="status">Connecting to backend…</span></span></div>
+<main id="main" tabindex="-1">
+<section id="rider-view">
+  <div class="page-heading"><div><span class="eyebrow">RIDER WORKSPACE</span><h1>Let’s make it fair.</h1><p>Tell us about your ride. Understand the evidence. See what happens next.</p></div><span class="persona">Rider workspace</span></div>
+  <section class="demo-guide" aria-labelledby="demo-guide-title">
+    <span class="motion-orb motion-orb-one" aria-hidden="true"></span><span class="motion-orb motion-orb-two" aria-hidden="true"></span>
+    <div class="demo-guide-copy"><span class="eyebrow">GUIDED DEMO</span><h2 id="demo-guide-title">Choose the story you want to show.</h2><p>Each preset prepares the real intake form. The same evidence, agents, safeguards and human-review workflow still run.</p></div>
+    <div class="scenario-grid">
+      <button type="button" class="scenario-card" data-scenario="no-show"><span class="scenario-icon" aria-hidden="true">01</span><strong>No-show evidence</strong><small>Arrival, contact and an eight-minute wait.</small><span>Prepare case →</span></button>
+      <button type="button" class="scenario-card featured" data-scenario="route"><span class="scenario-icon" aria-hidden="true">02</span><strong>Unsupported ERP</strong><small>Approved detour, but no recorded gantry.</small><span>Prepare case →</span></button>
+      <button type="button" class="scenario-card" data-scenario="human"><span class="scenario-icon" aria-hidden="true">03</span><strong>Human hand-off</strong><small>A safety concern bypasses automation.</small><span>Prepare case →</span></button>
+    </div>
+    <p id="demo-message" class="demo-message" role="status">Select a scenario or complete the form manually.</p>
+  </section>
+  <div class="rider-grid">
+    <section class="card intake"><div class="section-heading"><span class="number">01</span><div><h2>Request a fare review</h2><p>Your trip reference is generated automatically.</p></div></div>
+      <form id="intake-form">
+        <label for="trip">Trip reference</label><input id="trip" maxlength="80" required readonly placeholder="Generating your trip reference…" autocomplete="off" aria-describedby="trip-message"><p id="trip-message" class="small" role="status">Creating your trip reference.</p>
+        <p class="small">Generated references support the organizer no-show sample and a clearly labelled synthetic route/ERP scenario.</p>
+        <label for="category">What would you like reviewed?</label><select id="category" required><option value="no-show">No-show charge</option><option value="route">Route or additional charge</option></select>
+        <label for="complaint">Your perspective</label><textarea id="complaint" rows="5" minlength="10" maxlength="2000" required placeholder="Describe what happened and what you would like checked. "></textarea><div class="input-help"><span>10–2,000 characters</span><span id="count">0 / 2000</span></div>
+        <label class="check"><input type="checkbox" id="safety"> This includes a safety incident or another concern that needs a person.</label>
+        <button class="button" type="submit">Submit request <span aria-hidden="true">→</span></button><p class="small">Your account is saved with the case. Live AI review starts automatically after both accounts arrive and sends the accounts and trip evidence to Tencent ADP. No real payment is made.</p><p id="form-message" role="status"></p>
+      </form>
+    </section>
+    <div><section class="card"><div class="section-heading"><span class="number">02</span><div><h2>Your cases</h2><p>Requests you have submitted.</p></div></div><div id="rider-cases" class="case-list"></div></section><section class="card outcome" id="rider-outcome" aria-live="polite"></section></div>
+  </div>
+</section>
+<section id="driver-view" hidden>
+  <div class="page-heading"><div><span class="eyebrow">DRIVER WORKSPACE</span><h1>Your side matters, too.</h1><p>Review the trip in question and share what happened from your perspective.</p></div><span class="persona">Driver workspace</span></div>
+  <p class="notice">Cases assigned to you appear here after the rider submits a request. No notification is sent. A missing response never establishes fault.</p>
+  <div class="rider-grid"><section class="card"><div class="section-heading"><span class="number">01</span><div><h2>Requests for your account</h2><p>Each response joins the existing rider case.</p></div></div><div id="driver-cases" class="case-list"></div></section><section class="card" id="driver-detail" aria-live="polite"></section></div>
+</section>
+<section id="support-view" hidden>
+  <div class="page-heading"><div><span class="eyebrow">REVIEW WORKSPACE</span><h1>Evidence before a verdict.</h1><p>Inspect both perspectives, review uncertainty, and explain the outcome.</p></div><span class="persona">Case review</span></div>
+  <div class="support-grid"><aside class="card queue"><h2>Case queue</h2><label for="search">Search case ID</label><input id="search" type="search" placeholder="Search case reference"><label for="status-filter">Status</label><select id="status-filter"><option value="all">All statuses</option><option value="human_review">Human review required</option><option value="awaiting_driver">Awaiting driver</option><option value="ready">Ready for review</option><option value="queued">Queued for AI review</option><option value="retrying">Retry scheduled</option><option value="running">Running</option><option value="review_failed">AI review unavailable</option><option value="completed">Completed</option></select><label for="category-filter">Category</label><select id="category-filter"><option value="all">All categories</option><option value="no-show">No-show charge</option><option value="route">Route / charge</option></select><div id="queue-list" class="case-list"></div></aside><section id="workspace" aria-live="polite"></section></div>
+</section>
+<section id="admin-view" hidden>
+  <div class="page-heading"><div><span class="eyebrow">ADMIN DECISIONS</span><h1>Resolve cases needing human review.</h1><p>Inspect the accounts and original AI proposal, then record a final decision with your rationale.</p></div></div>
+  <div class="support-grid"><aside class="card queue"><h2>Human-review queue</h2><p class="small">Includes technical failures and previously finalized cases.</p><div id="admin-cases" class="case-list"></div></aside><section id="admin-detail" aria-live="polite"></section></div>
+</section>
+<section class="process"><div><span class="eyebrow">HOW THE REVIEW WORKS</span><h2>Three roles. Both sides heard.</h2></div><article><b>01 · Rider Advocate</b><p>Builds the rider’s case from supported evidence.</p></article><article><b>02 · Driver Advocate</b><p>Examines the driver’s records and responds to opposing evidence.</p></article><article><b>03 · Judge</b><p>Weighs both arguments. Uncertainty goes to human review.</p></article></section>
+</main>
+<footer><span class="brand">fare<span>enough</span><b>.</b></span><span>FareEnough · Independent dispute review</span><span>No real payments or messages</span></footer>
+
+<dialog id="evidence-dialog" aria-labelledby="evidence-title"><button type="button" id="close-evidence" autofocus>Close evidence</button><div id="evidence-content"></div></dialog>
+</body></html>

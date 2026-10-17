@@ -1,0 +1,32 @@
+{
+  "fixture_id": "ROUTE-ERP-001",
+  "synthetic": true,
+  "service_type": "RydeX",
+  "trip_id": "TRIP-ROUTE-ERP-001",
+  "rider_id": "rider-demo-001",
+  "driver_id": "driver-demo-001",
+  "filed_at": "2026-10-10T10:00:00+08:00",
+  "pickup": { "name": "Marina Bay", "lat": 1.2838, "lng": 103.8591 },
+  "dropoff": { "name": "Orchard Road", "lat": 1.3048, "lng": 103.8318 },
+  "reference_route": {
+    "distance_meters": 10500,
+    "duration_seconds": 1500,
+    "points": [[1.2838,103.8591],[1.2904,103.8502],[1.3002,103.8401],[1.3048,103.8318]]
+  },
+  "actual_route": {
+    "distance_meters": 12800,
+    "duration_seconds": 2100,
+    "points": [[1.2838,103.8591],[1.2765,103.8464],[1.2884,103.8253],[1.3048,103.8318]]
+  },
+  "route_context": "The rider requested and approved the destination-side detour before it began.",
+  "quoted_fare_minor": 1800,
+  "paid_fare_minor": 2125,
+  "fare_lines": [
+    { "id": "fare-base-001", "label": "Fixed quoted fare", "amount_minor": 1800, "supported_minor": 1800 },
+    { "id": "fare-erp-001", "label": "ERP", "amount_minor": 325, "supported_minor": 0 }
+  ],
+  "gantry_coverage": "Complete synthetic gantry feed for the recorded trip window; no gantry passage is present.",
+  "rider_consent": "Rider requested and approved the detour in the recorded chat.",
+  "payment_id": "PAY-ROUTE-ERP-001",
+  "prior_relief_minor": 0
+}

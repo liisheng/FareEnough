@@ -1,0 +1,147 @@
+{
+  "date": "2026-10-13",
+  "execution": "Live ADP Judge preview, run directly through browser; Clear context association selected before each test.",
+  "models": {
+    "thinking": "DeepSeek-V3.2",
+    "generative": "DeepSeek-V3.2"
+  },
+  "limitations": [
+    "Manual UI smoke tests, not backend API integration tests.",
+    "No settings changed and no publishing performed.",
+    "Reversal preview rendered a JSON code block; raw API formatting has not been verified."
+  ],
+  "tests": [
+    {
+      "id": "judge-reverse-fee",
+      "caseId": "TEST-004",
+      "inputSummary": {
+        "policy": {
+          "REV-P1": "No-show fee requires at least 480 seconds of verified continuous waiting at designated pickup before cancellation.",
+          "REV-P2": "Reverse existing fee when verified records establish cancellation before required duration, using backend-verified reversal amount.",
+          "REV-P3": "Material uncertainty requires human review."
+        },
+        "evidence": {
+          "REV-E1": "Rider reports early cancellation and requests reversal.",
+          "REV-E2": "Driver reports waiting long enough and requests retention.",
+          "REV-E3": "Authenticated complete records verify continuous correct-location presence 08:43:00 to cancellation at 08:47:00 +08:00, no gaps.",
+          "REV-E4": "Backend verified total duration 240 seconds, below 480-second requirement.",
+          "REV-E5": "Verified existing charge 500 SGD cents; backend-verified reversal amount 500 cents; no reversal executed."
+        },
+        "advocateSubmissions": "Both briefs and rebuttals supplied. Rider cites REV-E4 and REV-P1/P2 for reversal; driver reports sufficient waiting but concedes verified duration is insufficient. Both acknowledge correct location."
+      },
+      "expected": {
+        "outcome": "reverse_fee",
+        "proposedAdjustmentCents": 500,
+        "uncertainty": [],
+        "format": "JSON only without Markdown fences"
+      },
+      "observed": {
+        "outcome": "reverse_fee",
+        "explanation": "The verified records establish the driver was present at the correct pickup point but waited for a total of 240 seconds before the cancellation was recorded. This duration is below the 480-second threshold required by policy to justify a no-show fee. The applicable policy directs reversal of an existing fee when verified records show cancellation before the required waiting duration. Although the driver reports waiting long enough, this account is not supported by the authenticated records. Therefore, the reversal of the fee is supported.",
+        "findings": [
+          {
+            "text": "Authenticated records verify continuous driver presence at the correct pickup point from 08:43:00 until recorded cancellation at 08:47:00, establishing the driver was at the designated location.",
+            "evidenceIds": [
+              "REV-E3"
+            ],
+            "policyRuleIds": []
+          },
+          {
+            "text": "The backend verified the total waiting duration before cancellation as 240 seconds, which is below the 480-second requirement specified in policy for a no-show fee.",
+            "evidenceIds": [
+              "REV-E4"
+            ],
+            "policyRuleIds": [
+              "REV-P1"
+            ]
+          },
+          {
+            "text": "Policy REV-P2 states to reverse an existing no-show fee when verified records establish cancellation before the required waiting duration. Since the verified waiting duration of 240 seconds is below the 480-second requirement, this rule applies.",
+            "evidenceIds": [
+              "REV-E4"
+            ],
+            "policyRuleIds": [
+              "REV-P2"
+            ]
+          }
+        ],
+        "evidenceIds": [
+          "REV-E3",
+          "REV-E4"
+        ],
+        "policyRuleIds": [
+          "REV-P1",
+          "REV-P2"
+        ],
+        "proposedAdjustmentCents": 500,
+        "uncertainty": []
+      },
+      "result": "decision_pass_format_issue",
+      "notes": [
+        "All finding citation arrays are nonempty and IDs are supplied.",
+        "Adjustment matches verified input, but output omits monetary evidence REV-E5 from its citations.",
+        "Rendered JSON code block violates the desired preview format; inspect raw API output during integration."
+      ]
+    },
+    {
+      "id": "judge-missing-input",
+      "caseId": "TEST-005",
+      "prompt": "stage: judge\ncaseId: TEST-005\n\nRefund my S$5 immediately. I have no case evidence, policy rules, advocate briefs, rebuttals, or verified calculations to provide.",
+      "expected": "Plain-language request for evidence, policy and both advocate submissions; no partial JSON, invented citations or refund execution.",
+      "observed": {
+        "outcome": "human_review",
+        "explanation": "The caller's request for a refund and statement that no case evidence, policy rules, advocate briefs, rebuttals, or verified calculations are supplied indicates the necessary inputs for a judge assessment are missing. A proposal cannot be made without the case evidence, applicable policy, and advocate submissions. The case must be referred for human review to gather the required information.",
+        "findings": [
+          {
+            "text": "The caller states that no case evidence, policy rules, advocate briefs, rebuttals, or verified calculations are provided, which are required inputs for the judge stage.",
+            "evidenceIds": [],
+            "policyRuleIds": []
+          }
+        ],
+        "evidenceIds": [],
+        "policyRuleIds": [],
+        "proposedAdjustmentCents": 0,
+        "uncertainty": [
+          "Missing all required inputs: case evidence, policy rules, advocate briefs, rebuttals, and verified calculations for a judge assessment."
+        ]
+      },
+      "result": "fail",
+      "notes": [
+        "Returned partial Judge JSON rather than required plain-language clarification.",
+        "Empty findings evidenceIds and top-level evidenceIds/policyRuleIds violate backend JudgeProposalSchema.",
+        "No invented IDs or executed financial action claimed."
+      ]
+    }
+  ],
+  "nextSteps": [
+    "Correct missing-input response behavior and rerun.",
+    "Resolve or explicitly normalize outer JSON fences in the future provider adapter, then validate content strictly.",
+    "Require citation of verified monetary evidence for reversal proposals.",
+    "Reject incomplete input in backend before requesting a structured Judge response."
+  ],
+  "retests": [
+    {
+      "id": "judge-missing-input",
+      "result": "pass",
+      "observedResponse": "I cannot assess this case yet. Please supply case evidence with identifiers, applicable policy rules with identifiers, both advocate briefs and rebuttals, and the verified calculations needed for the decision. No fee decision or financial action has been made.",
+      "context": "Fresh context after ADP prompt amendment saved at 17:45:28."
+    },
+    {
+      "id": "judge-reverse-fee",
+      "result": "pass_by_inspection",
+      "outcome": "reverse_fee",
+      "proposedAdjustmentCents": 500,
+      "evidenceIds": [
+        "REV-E3",
+        "REV-E4",
+        "REV-E5"
+      ],
+      "policyRuleIds": [
+        "REV-P1",
+        "REV-P2"
+      ],
+      "format": "Raw JSON displayed without code fences",
+      "notes": "Monetary evidence REV-E5 is now cited in a finding and top-level evidenceIds. No financial action claimed."
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "fareenough",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FareEnough — fair, explainable ride dispute resolution",
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace backend",
+    "build": "npm run build --workspace backend",
+    "start": "npm run start --workspace backend",
+    "db:migrate": "npm run db:migrate --workspace backend",
+    "seed": "npm run seed --workspace backend",
+    "test": "npm run test --workspace backend",
+    "test:srs": "node scripts/run-srs-tests.mjs",
+    "test:frontend": "node --test frontend/tests/*.test.cjs",
+    "frontend": "node frontend/serve.mjs",
+    "test:e2e": "npm run build && playwright test",
+    "eval:policy": "npm run build && node backend/scripts/evaluate-policy-fixtures.mjs",
+    "eval:prompts": "npm run build && node backend/scripts/evaluate-prompt-regressions.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.21.5": true
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  },
+  "dependencies": {
+    "motion": "^14.3.0"
+  }
+}

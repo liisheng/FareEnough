@@ -25,6 +25,38 @@
     "bytes": 7798,
     "sha256": "a11fb5b04672c15b56be01a637726945be192e26e276e3367fe7dc7d80685167",
     "origin": "User attachment",
-    "copied_on": "2026-10-07"
+    "copied_on": "2026-10-07",
+    "duplicate_verifications": [
+      {
+        "supplied_file": "RydeResolve Sample Dataset — DISP-002 No-Show Charge Dispute (SG).md",
+        "verified_on": "2026-10-15",
+        "sha256": "a11fb5b04672c15b56be01a637726945be192e26e276e3367fe7dc7d80685167",
+        "raw_bytes_match": true,
+        "parsed_json_matches_original": true,
+        "parsed_json_matches_fixture": true,
+        "action": "Reused existing original and fixture; no duplicate copy."
+      }
+    ]
+  },
+  {
+    "file": "Document 1 — Fare Dispute Sample Data (JSON).md",
+    "bytes": 4107,
+    "sha256": "fec27ef148ff8ab047bf182eeb4b21c6eb5d6eb0f91c2af66de78d8d9f663c90",
+    "origin": "User-supplied WhatsApp transfer attachment",
+    "copied_on": "2026-10-15"
+  },
+  {
+    "file": "Document 2 — Ryde Dispute Resolution Policy v2.1 (Markdown).md",
+    "bytes": 13109,
+    "sha256": "827c4d2cab2d4db9e176521000b079632bbe80c20f69c3ffd0addecc8cbc8699",
+    "origin": "User-supplied WhatsApp transfer attachment",
+    "copied_on": "2026-10-15"
+  },
+  {
+    "file": "RydeResolve Route Deviation Dataset — DISP-001.md",
+    "bytes": 18500,
+    "sha256": "dffee7ba2c2e8777e51b1dde4bc258992c902bed6d408c4518eec9b288d9c494",
+    "origin": "User-supplied WhatsApp transfer attachment",
+    "copied_on": "2026-10-15"
   }
 ]

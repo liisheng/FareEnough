@@ -1,0 +1,62 @@
+{
+  "observedAtUtc": "2026-10-16 00:26:07 UTC",
+  "source": "Read-only ADP Settings UI inspection in signed-in in-app browser",
+  "scope": "Current draft settings. This does not independently certify the settings of a published version.",
+  "apps": [
+    {
+      "role": "rider_advocate",
+      "appId": "2109927654204767616",
+      "thinking": {
+        "model": "DeepSeek-V3.2",
+        "temperature": 0.6,
+        "deepThinking": false
+      },
+      "generative": {
+        "model": "DeepSeek-V3.2",
+        "temperature": 0.1,
+        "deepThinking": false,
+        "contextTurns": 5
+      },
+      "publishButtonDisabled": true
+    },
+    {
+      "role": "driver_advocate",
+      "appId": "2109932553755822848",
+      "thinking": {
+        "model": "DeepSeek-V3.2",
+        "temperature": 0.6,
+        "deepThinking": false
+      },
+      "generative": {
+        "model": "DeepSeek-V3.2",
+        "temperature": 0.1,
+        "deepThinking": false,
+        "contextTurns": 5
+      },
+      "publishButtonDisabled": true
+    },
+    {
+      "role": "judge",
+      "appId": "2109936301693599104",
+      "thinking": {
+        "model": "DeepSeek-V3.2",
+        "temperature": 0.6,
+        "deepThinking": true
+      },
+      "generative": {
+        "model": "DeepSeek-V3.2",
+        "temperature": 0.1,
+        "deepThinking": true,
+        "contextTurns": 5
+      },
+      "pendingPublicationBadge": true
+    }
+  ],
+  "changesApplied": false,
+  "proposedExperiment": "Enable Deep Thinking in both model slots for both advocates, publish them, and retain model names, temperatures and prompts. Explicit approval requested after automatic review blocked the initial setting action.",
+  "limitations": [
+    "The published Judge configuration was not independently inspected; the user previously reported Judge-only Deep Thinking was published.",
+    "Current repository prompts are sent through SystemRole during evaluation and differ from the saved console prompts.",
+    "No API keys or private reasoning are recorded."
+  ]
+}
